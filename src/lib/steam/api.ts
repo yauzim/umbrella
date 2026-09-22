@@ -113,6 +113,9 @@ export interface SteamPlayerSummary {
   profileurl: string;
   /** 1 = private, 3 = public. Anything below 3 means we cannot read stats. */
   communityvisibilitystate: number;
+  /** ISO-3166-1 alpha-2. Absent unless the profile is public and the
+   *  person actually set a country, so treat it as optional. */
+  loccountrycode?: string;
 }
 
 export async function getPlayerSummary(
@@ -136,6 +139,38 @@ export async function resolveVanityUrl(name: string): Promise<string | null> {
     vanityurl: name,
   });
   return data.response.success === 1 ? (data.response.steamid ?? null) : null;
+}
+
+export interface SteamFriend {
+  steamid: string;
+  friend_since: number; // unix seconds
+}
+
+/**
+ * Friend list, or null when it is not public.
+ *
+ * Friend-list visibility is a separate Steam privacy setting from profile
+ * visibility, so a fully public profile can still return 401 here. That is
+ * a normal answer, not a failure.
+ */
+export async function getFriendList(
+  steamId: string,
+): Promise<SteamFriend[] | null> {
+  try {
+    const data = await steamFetch<{
+      friendslist?: { friends?: SteamFriend[] };
+    }>("/ISteamUser/GetFriendList/v0001/", {
+      key: apiKey(),
+      steamid: steamId,
+      relationship: "friend",
+    });
+    return data.friendslist?.friends ?? [];
+  } catch (err) {
+    if (err instanceof SteamApiError && (err.status === 401 || err.isPrivate)) {
+      return null;
+    }
+    throw err;
+  }
 }
 
 /* ------------------------------------------------------------------ */

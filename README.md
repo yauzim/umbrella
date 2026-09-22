@@ -77,10 +77,17 @@ Captured direction, not yet built:
 
 - **Ratings and reviews per game** — stars and comments in the Letterboxd
   sense, with completion-time context closer to HowLongToBeat.
-- **Leaderboards** — 100% completions, rare-achievement counts, and similar
-  standings.
-- **Leaderboard filters** — world, region and friends, with a control that
-  jumps you to your own position rather than making you scroll for it.
+- **List editing** — the `lists` and `list_items` tables exist but nothing
+  writes to them yet. This is the backlog / currently-hunting half.
+
+Built since: leaderboards (`/leaderboard`) rank completions, rare unlocks
+and total achievements, scoped to world, region or Steam friends, with a
+jump-to-my-position control.
+
+Region depends on `loccountrycode`, which Steam only returns for a public
+profile that has a country set — so when it is missing the page says how to
+fix it rather than filing people under "Unknown". Friends come from
+`GetFriendList`, which needs a public friend list.
 
 Two constraints these should respect, because they are what the product is
 for:

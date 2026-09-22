@@ -14,6 +14,7 @@ import {
   games,
   playtimeSnapshots,
   userAchievements,
+  steamFriends,
   userGames,
   users,
 } from "@/db/schema";
@@ -21,6 +22,7 @@ import {
   gameHeaderUrl,
   gameIconUrl,
   getGlobalAchievementPercentages,
+  getFriendList,
   getOwnedGames,
   getPlayerAchievements,
   getPlayerSummary,
@@ -98,6 +100,7 @@ async function syncProfileAndLibrary(steamId: string) {
         personaName: summary.personaname,
         avatarUrl: summary.avatarfull,
         profileUrl: summary.profileurl,
+        countryCode: summary.loccountrycode ?? null,
         profileIsPrivate: isPrivate,
         librarySyncedAt: now,
       })
@@ -109,6 +112,7 @@ async function syncProfileAndLibrary(steamId: string) {
           personaName: summary.personaname,
           avatarUrl: summary.avatarfull,
           profileUrl: summary.profileurl,
+          countryCode: summary.loccountrycode ?? null,
           profileIsPrivate: isPrivate,
           librarySyncedAt: now,
         },
@@ -168,8 +172,64 @@ async function syncProfileAndLibrary(steamId: string) {
   });
 
   await claimHandleFromVanityUrl(steamId, summary.profileurl);
+  await syncFriends(steamId);
 
   return { summary, library, isPrivate };
+}
+
+/**
+ * Mirrors the Steam friend list so the leaderboard can scope to friends.
+ * Refreshed daily rather than per sync: friendships change slowly and this
+ * is one more API call per user.
+ */
+const FRIENDS_TTL_MS = 24 * 60 * 60 * 1000;
+
+async function syncFriends(steamId: string): Promise<void> {
+  const [row] = await db
+    .select({ syncedAt: users.friendsSyncedAt })
+    .from(users)
+    .where(eq(users.steamId, steamId))
+    .limit(1);
+
+  if (
+    row?.syncedAt &&
+    Date.now() - row.syncedAt.getTime() < FRIENDS_TTL_MS
+  ) {
+    return;
+  }
+
+  const friends = await getFriendList(steamId);
+  const now = new Date();
+
+  // null means the friend list is private — stamp anyway so we do not retry
+  // on every batch of every sync.
+  if (friends === null) {
+    await db
+      .update(users)
+      .set({ friendsSyncedAt: now })
+      .where(eq(users.steamId, steamId));
+    return;
+  }
+
+  db.transaction((tx) => {
+    tx.delete(steamFriends)
+      .where(eq(steamFriends.steamId, steamId))
+      .run();
+    for (const f of friends) {
+      tx.insert(steamFriends)
+        .values({
+          steamId,
+          friendSteamId: f.steamid,
+          friendsSince: f.friend_since ? new Date(f.friend_since * 1000) : null,
+        })
+        .onConflictDoNothing()
+        .run();
+    }
+    tx.update(users)
+      .set({ friendsSyncedAt: now })
+      .where(eq(users.steamId, steamId))
+      .run();
+  });
 }
 
 /**

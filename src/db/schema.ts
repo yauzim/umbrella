@@ -83,10 +83,16 @@ export const users = sqliteTable("users", {
   avatarAchievementId: integer("avatar_achievement_id"),
   theme: text("theme").notNull().default("dark"),
 
+  // ISO-3166-1 alpha-2, straight from Steam. Only present when the profile
+  // is public AND the person filled in a country, so it is often null and
+  // the UI has to ask rather than guess.
+  countryCode: text("country_code"),
+
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
   librarySyncedAt: integer("library_synced_at", { mode: "timestamp" }),
+  friendsSyncedAt: integer("friends_synced_at", { mode: "timestamp" }),
   // Set when Steam reports a private profile, so the UI can explain why
   // the page is empty instead of silently showing nothing.
   profileIsPrivate: integer("profile_is_private", { mode: "boolean" })
@@ -272,6 +278,29 @@ export const showcases = sqliteTable(
 /* ---------------------------------------------------------------
  * SOCIAL
  * ------------------------------------------------------------- */
+
+/**
+ * Steam friendships, mirrored so the leaderboard can scope to "friends".
+ * Distinct from `follows` below: this is imported from Steam and not
+ * editable here, whereas a follow is a choice someone makes on Umbrella.
+ * Only readable when the person's friend list is public.
+ */
+export const steamFriends = sqliteTable(
+  "steam_friends",
+  {
+    steamId: text("steam_id")
+      .notNull()
+      .references(() => users.steamId, { onDelete: "cascade" }),
+    // Not a foreign key: most friends will never sign in here, and we still
+    // want the edge so their row lights up if they ever do.
+    friendSteamId: text("friend_steam_id").notNull(),
+    friendsSince: integer("friends_since", { mode: "timestamp" }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.steamId, t.friendSteamId] }),
+    index("steam_friends_owner_idx").on(t.steamId),
+  ],
+);
 
 export const follows = sqliteTable(
   "follows",
