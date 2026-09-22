@@ -66,10 +66,16 @@ export const users = sqliteTable("users", {
   profileUrl: text("profile_url"),
 
   // --- profile customization: the whole point of the product ---
+  // Everything here is *earned*, never uploaded. You decorate a profile
+  // with the games you own and the achievements you actually unlocked,
+  // the way PSN and Xbox used to. No arbitrary image uploads.
   handle: text("handle").unique(), // vanity slug for /u/<handle>
   bio: text("bio"),
   accentColor: text("accent_color").notNull().default("#5b8def"),
-  bannerAppid: integer("banner_appid"), // use a game's art as your banner
+  bannerAppid: integer("banner_appid"), // a game's art as your banner
+  // Avatar precedence: achievement icon > game icon > Steam avatar.
+  avatarAppid: integer("avatar_appid"),
+  avatarAchievementId: integer("avatar_achievement_id"),
   theme: text("theme").notNull().default("dark"),
 
   createdAt: integer("created_at", { mode: "timestamp" })
@@ -196,6 +202,32 @@ export const listItems = sqliteTable(
   (t) => [
     unique("list_items_unique_game").on(t.listId, t.appid),
     index("list_items_list_idx").on(t.listId, t.position),
+  ],
+);
+
+/* ---------------------------------------------------------------
+ * FAVOURITES
+ * The four games a person chooses to put directly under their name.
+ * Deliberately capped: a shelf with everything on it says nothing, and
+ * a small fixed number keeps setup to a minute rather than an evening.
+ * ------------------------------------------------------------- */
+
+export const FAVORITE_SLOTS = 4;
+
+export const favoriteGames = sqliteTable(
+  "favorite_games",
+  {
+    steamId: text("steam_id")
+      .notNull()
+      .references(() => users.steamId, { onDelete: "cascade" }),
+    appid: integer("appid")
+      .notNull()
+      .references(() => games.appid, { onDelete: "cascade" }),
+    position: integer("position").notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.steamId, t.appid] }),
+    index("favorites_owner_idx").on(t.steamId, t.position),
   ],
 );
 

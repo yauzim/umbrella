@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { GameArt } from "@/components/game-art";
 import { formatPlaytime } from "@/lib/rarity";
 import type { GameProgress } from "@/lib/queries";
 
@@ -12,16 +12,11 @@ export function GameCard({ game }: { game: GameProgress }) {
   return (
     <article className="group overflow-hidden rounded-lg border border-border bg-panel transition-colors hover:border-border-strong">
       <div className="relative aspect-[460/215] bg-raised">
-        {game.headerUrl && (
-          <Image
-            src={game.headerUrl}
-            alt=""
-            fill
-            sizes="(max-width: 768px) 50vw, 260px"
-            className="object-cover"
-            unoptimized
-          />
-        )}
+        <GameArt
+          appid={game.appid}
+          name={game.name}
+          sizes="(max-width: 768px) 50vw, 260px"
+        />
         {complete && (
           <span className="absolute right-2 top-2 rounded-md bg-black/75 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-accent backdrop-blur">
             100%

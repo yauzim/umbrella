@@ -1,16 +1,20 @@
 import Image from "next/image";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AchievementRow, AchievementTile } from "@/components/achievement-tile";
 import { GameCard } from "@/components/game-card";
 import { SyncButton } from "@/components/sync-button";
 import {
+  getFavoriteGames,
   getInProgressGames,
   getLists,
   getPerfectGames,
   getProfileStats,
   getProfileUser,
   getRarestUnlocks,
+  getRecentGames,
   getTimeline,
+  resolveAvatarUrl,
 } from "@/lib/queries";
 import { formatPercent, formatUnlockDate } from "@/lib/rarity";
 import { getSession } from "@/lib/session";
@@ -28,23 +32,33 @@ export default async function ProfilePage({
   const session = await getSession();
   const isOwner = session?.steamId === user.steamId;
 
-  const [stats, rarest, perfect, inProgress, timeline, lists] =
-    await Promise.all([
-      getProfileStats(user.steamId),
-      getRarestUnlocks(user.steamId, 6),
-      getPerfectGames(user.steamId, 8),
-      getInProgressGames(user.steamId, 8),
-      getTimeline(user.steamId, { limit: 25 }),
-      getLists(user.steamId),
-    ]);
+  const [
+    stats,
+    favorites,
+    recent,
+    rarest,
+    perfect,
+    inProgress,
+    timeline,
+    lists,
+    avatarUrl,
+  ] = await Promise.all([
+    getProfileStats(user.steamId),
+    getFavoriteGames(user.steamId),
+    getRecentGames(user.steamId, 4),
+    getRarestUnlocks(user.steamId, 6, 2),
+    getPerfectGames(user.steamId, 8),
+    getInProgressGames(user.steamId, 8),
+    getTimeline(user.steamId, { limit: 25 }),
+    getLists(user.steamId),
+    resolveAvatarUrl(user),
+  ]);
 
   const bannerUrl = user.bannerAppid
     ? gameHeaderUrl(user.bannerAppid)
-    : (rarest[0]?.gameHeaderUrl ?? null);
+    : (favorites[0]?.headerUrl ?? rarest[0]?.gameHeaderUrl ?? null);
 
   const neverSynced = user.librarySyncedAt === null;
-  // Without a key nothing can be fetched, so say so plainly rather than
-  // letting the sync fail with a stack trace.
   const hasApiKey = Boolean(process.env.STEAM_API_KEY);
 
   return (
@@ -72,41 +86,49 @@ export default async function ProfilePage({
         <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/85 to-transparent" />
       </div>
 
-      <div className="mx-auto max-w-6xl px-4 pb-24">
+      <div className="mx-auto max-w-6xl px-4 pb-24 sm:px-6">
         {/* Identity --------------------------------------------------- */}
-        <header className="-mt-12 flex flex-wrap items-end gap-5">
-          {/* Always rendered, even without a Steam avatar: it is what gives
-              the header its height, so a null avatar would otherwise pull
-              the name up into the banner where it is unreadable. */}
-          <div
-            className="size-24 shrink-0 overflow-hidden rounded-2xl border-4 border-bg bg-raised sm:size-28"
-            style={{ outline: `2px solid ${user.accentColor}` }}
-          >
-            {user.avatarUrl ? (
-              <Image
-                src={user.avatarUrl}
-                alt=""
-                width={112}
-                height={112}
-                // Above the fold and the page's identity: lazy-loading it
-                // leaves an empty box on every first paint.
-                priority
-                className="size-full object-cover"
-                unoptimized
-              />
-            ) : (
-              <span
-                className="flex size-full items-center justify-center text-3xl font-bold"
-                style={{ color: user.accentColor }}
-                aria-hidden
-              >
-                {user.personaName.charAt(0).toUpperCase()}
-              </span>
-            )}
+        <header className="-mt-10 flex flex-col gap-4 sm:-mt-12 sm:flex-row sm:items-end sm:gap-5">
+          <div className="flex items-end gap-4">
+            {/* Always rendered, even without art: it is what gives the
+                header its height, so an empty avatar would otherwise pull
+                the name up into the banner where it is unreadable. */}
+            <div
+              className="size-20 shrink-0 overflow-hidden rounded-2xl border-4 border-bg bg-raised sm:size-28"
+              style={{ outline: `2px solid ${user.accentColor}` }}
+            >
+              {avatarUrl ? (
+                <Image
+                  src={avatarUrl}
+                  alt=""
+                  width={112}
+                  height={112}
+                  // Above the fold and the page's identity: lazy-loading it
+                  // leaves an empty box on every first paint.
+                  priority
+                  className="size-full object-cover"
+                  unoptimized
+                />
+              ) : (
+                <span
+                  className="flex size-full items-center justify-center text-3xl font-bold"
+                  style={{ color: user.accentColor }}
+                  aria-hidden
+                >
+                  {user.personaName.charAt(0).toUpperCase()}
+                </span>
+              )}
+            </div>
+
+            <div className="min-w-0 flex-1 pb-1 sm:hidden">
+              <h1 className="truncate text-xl font-bold tracking-tight">
+                {user.personaName}
+              </h1>
+            </div>
           </div>
 
-          <div className="min-w-0 flex-1 pb-1">
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+          <div className="min-w-0 flex-1 sm:pb-1">
+            <h1 className="hidden text-2xl font-bold tracking-tight sm:block sm:text-3xl">
               {user.personaName}
             </h1>
             {user.bio ? (
@@ -120,11 +142,21 @@ export default async function ProfilePage({
             )}
           </div>
 
-          {isOwner && hasApiKey && <SyncButton autoStart={neverSynced} />}
+          {isOwner && (
+            <div className="flex items-start justify-between gap-3 sm:flex-col sm:items-end">
+              <Link
+                href="/settings"
+                className="rounded-lg border border-border-strong bg-raised px-3 py-1.5 text-sm font-medium transition-colors hover:border-accent"
+              >
+                Customize
+              </Link>
+              {hasApiKey && <SyncButton autoStart={neverSynced} />}
+            </div>
+          )}
         </header>
 
         {/* Stats ------------------------------------------------------ */}
-        <section className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-4">
+        <section className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:mt-8 sm:grid-cols-4">
           <Stat label="Achievements" value={stats.unlocked.toLocaleString()} />
           <Stat
             label="100% games"
@@ -181,7 +213,7 @@ export default async function ProfilePage({
           </p>
         )}
 
-        {neverSynced && !user.profileIsPrivate && (
+        {neverSynced && !user.profileIsPrivate && hasApiKey && (
           <p className="mt-4 rounded-lg border border-border bg-panel px-4 py-3 text-sm text-muted">
             {isOwner
               ? "Nothing synced yet — the first scan is running now."
@@ -189,21 +221,52 @@ export default async function ProfilePage({
           </p>
         )}
 
-        {/* Rarest ----------------------------------------------------- */}
-        {rarest.length > 0 && (
-          <Section
-            title="Rarest unlocks"
-            hint="Ordered by how few owners on Steam have ever earned them"
-          >
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {rarest.map((u) => (
-                <AchievementTile key={u.achievementId} unlock={u} />
-              ))}
-            </div>
-          </Section>
+        {/* Pinned + recent -------------------------------------------- */}
+        {(favorites.length > 0 || recent.length > 0) && (
+          <div className="mt-8 grid gap-8 lg:grid-cols-2">
+            <section>
+              <div className="mb-3 flex items-baseline justify-between gap-3">
+                <h2 className="text-lg font-semibold tracking-tight">Pinned</h2>
+                {isOwner && favorites.length === 0 && (
+                  <Link
+                    href="/settings"
+                    className="text-xs text-faint underline-offset-2 hover:underline"
+                  >
+                    Pick four
+                  </Link>
+                )}
+              </div>
+              {favorites.length > 0 ? (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
+                  {favorites.map((g) => (
+                    <GameCard key={g.appid} game={g} />
+                  ))}
+                </div>
+              ) : (
+                <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-xs text-faint">
+                  {isOwner
+                    ? "Pin four games you are proud of."
+                    : "Nothing pinned yet."}
+                </p>
+              )}
+            </section>
+
+            {recent.length > 0 && (
+              <section>
+                <h2 className="mb-3 text-lg font-semibold tracking-tight">
+                  Recently played
+                </h2>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
+                  {recent.map((g) => (
+                    <GameCard key={g.appid} game={g} />
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
         )}
 
-        {/* Perfect ---------------------------------------------------- */}
+        {/* Completed -------------------------------------------------- */}
         {perfect.length > 0 && (
           <Section
             title="Completed"
@@ -212,6 +275,20 @@ export default async function ProfilePage({
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {perfect.map((g) => (
                 <GameCard key={g.appid} game={g} />
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* Rarest ----------------------------------------------------- */}
+        {rarest.length > 0 && (
+          <Section
+            title="Rarest unlocks"
+            hint="At most two per game, so the shelf shows range"
+          >
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {rarest.map((u) => (
+                <AchievementTile key={u.achievementId} unlock={u} />
               ))}
             </div>
           </Section>
@@ -299,9 +376,9 @@ function Stat({
   accent?: boolean;
 }) {
   return (
-    <div className="bg-panel px-4 py-4">
+    <div className="bg-panel px-3 py-3 sm:px-4 sm:py-4">
       <p
-        className="tnum text-2xl font-bold tracking-tight"
+        className="tnum text-xl font-bold tracking-tight sm:text-2xl"
         style={accent ? { color: "var(--accent)" } : undefined}
       >
         {value}
