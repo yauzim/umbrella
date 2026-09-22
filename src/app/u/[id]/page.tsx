@@ -50,7 +50,7 @@ export default async function ProfilePage({
       style={{ ["--accent" as string]: user.accentColor }}
     >
       {/* Banner ------------------------------------------------------- */}
-      <div className="relative h-48 overflow-hidden border-b border-border sm:h-60">
+      <div className="relative h-40 overflow-hidden border-b border-border sm:h-52">
         {bannerUrl ? (
           <Image
             src={bannerUrl}
@@ -64,23 +64,40 @@ export default async function ProfilePage({
         ) : (
           <div className="absolute inset-0 bg-panel" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/70 to-transparent" />
+        {/* Opaque at the base so the identity block below always lands on a
+            flat ground, whatever the cover art happens to be doing. */}
+        <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/85 to-transparent" />
       </div>
 
       <div className="mx-auto max-w-6xl px-4 pb-24">
         {/* Identity --------------------------------------------------- */}
-        <header className="-mt-16 flex flex-wrap items-end gap-5">
-          {user.avatarUrl && (
-            <Image
-              src={user.avatarUrl}
-              alt=""
-              width={112}
-              height={112}
-              className="size-24 rounded-2xl border-4 border-bg sm:size-28"
-              style={{ outline: `2px solid ${user.accentColor}` }}
-              unoptimized
-            />
-          )}
+        <header className="-mt-12 flex flex-wrap items-end gap-5">
+          {/* Always rendered, even without a Steam avatar: it is what gives
+              the header its height, so a null avatar would otherwise pull
+              the name up into the banner where it is unreadable. */}
+          <div
+            className="size-24 shrink-0 overflow-hidden rounded-2xl border-4 border-bg bg-raised sm:size-28"
+            style={{ outline: `2px solid ${user.accentColor}` }}
+          >
+            {user.avatarUrl ? (
+              <Image
+                src={user.avatarUrl}
+                alt=""
+                width={112}
+                height={112}
+                className="size-full object-cover"
+                unoptimized
+              />
+            ) : (
+              <span
+                className="flex size-full items-center justify-center text-3xl font-bold"
+                style={{ color: user.accentColor }}
+                aria-hidden
+              >
+                {user.personaName.charAt(0).toUpperCase()}
+              </span>
+            )}
+          </div>
 
           <div className="min-w-0 flex-1 pb-1">
             <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
