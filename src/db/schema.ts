@@ -27,6 +27,11 @@ export const games = sqliteTable("games", {
   achievementCount: integer("achievement_count").notNull().default(0),
   schemaSyncedAt: integer("schema_synced_at", { mode: "timestamp" }),
   raritySyncedAt: integer("rarity_synced_at", { mode: "timestamp" }),
+  // Recent releases serve header art from a path containing a content
+  // hash, which cannot be constructed from the appid — it has to be read
+  // from the store API. Once checked, the resolved URL lives in headerUrl
+  // and this stamp stops us asking again.
+  artCheckedAt: integer("art_checked_at", { mode: "timestamp" }),
 });
 
 export const achievements = sqliteTable(

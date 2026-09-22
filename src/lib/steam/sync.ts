@@ -1,4 +1,13 @@
-import { and, eq, gt, isNotNull, notInArray } from "drizzle-orm";
+import {
+  and,
+  count,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  notInArray,
+} from "drizzle-orm";
 import { db } from "@/db";
 import {
   achievements,
@@ -16,6 +25,7 @@ import {
   getPlayerAchievements,
   getPlayerSummary,
   getSchemaForGame,
+  resolveHeaderImage,
   pooled,
 } from "./api";
 
@@ -157,7 +167,101 @@ async function syncProfileAndLibrary(steamId: string) {
     }
   });
 
+  await claimHandleFromVanityUrl(steamId, summary.profileurl);
+
   return { summary, library, isPrivate };
+}
+
+/**
+ * Gives new profiles a readable URL.
+ *
+ * Steam users with a vanity URL already have a name they identify with
+ * (steamcommunity.com/id/<name>), so we reuse it rather than leaving the
+ * profile at a 17-digit SteamID. Only ever set once — after that the
+ * handle is the user's to change.
+ */
+async function claimHandleFromVanityUrl(
+  steamId: string,
+  profileUrl: string | undefined,
+): Promise<void> {
+  if (!profileUrl) return;
+
+  const vanity = /\/id\/([^/]+)\/?$/.exec(profileUrl)?.[1];
+  if (!vanity) return; // profile is already /profiles/<id>, nothing to take
+
+  const candidate = normalizeHandle(vanity);
+  if (!candidate) return;
+
+  const [existing] = await db
+    .select({ handle: users.handle })
+    .from(users)
+    .where(eq(users.steamId, steamId))
+    .limit(1);
+  if (existing?.handle) return; // already has one; never overwrite
+
+  const [taken] = await db
+    .select({ steamId: users.steamId })
+    .from(users)
+    .where(eq(users.handle, candidate))
+    .limit(1);
+  if (taken) return; // someone got there first; they can pick one manually
+
+  await db
+    .update(users)
+    .set({ handle: candidate })
+    .where(eq(users.steamId, steamId));
+}
+
+/**
+ * Handles must not be able to impersonate a SteamID, or `/u/<digits>`
+ * would become ambiguous between a handle and an account number.
+ */
+export function normalizeHandle(raw: string): string | null {
+  const cleaned = raw.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+  if (cleaned.length < 3 || cleaned.length > 32) return null;
+  if (/^\d+$/.test(cleaned)) return null;
+  return cleaned;
+}
+
+/* ------------------------------------------------------------------ */
+/* Cover art                                                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Store lookups are rate limited far more tightly than the Web API, and
+ * only a minority of games need one, so this stays deliberately small.
+ * Anything not reached this batch is picked up by the next one.
+ */
+const ART_PER_BATCH = 12;
+const ART_CONCURRENCY = 2;
+
+/**
+ * Fills in header art for games we have not checked yet. Results are
+ * stored on the shared `games` row, so each game costs this once across
+ * every user on the instance.
+ */
+async function resolveMissingArt(appids: number[]): Promise<void> {
+  if (appids.length === 0) return;
+
+  const unchecked = await db
+    .select({ appid: games.appid })
+    .from(games)
+    .where(and(inArray(games.appid, appids), isNull(games.artCheckedAt)))
+    .limit(ART_PER_BATCH);
+
+  if (unchecked.length === 0) return;
+
+  await pooled(unchecked, ART_CONCURRENCY, async ({ appid }) => {
+    try {
+      const url = await resolveHeaderImage(appid);
+      db.update(games)
+        .set({ headerUrl: url, artCheckedAt: new Date() })
+        .where(eq(games.appid, appid))
+        .run();
+    } catch {
+      // Leave artCheckedAt null so a later sync retries this game.
+    }
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -415,7 +519,21 @@ export async function syncUser(
   // the next call naturally picks up where this one stopped.
   const pending = candidates.filter((g) => !alreadyFresh.has(g.appid));
   const toScan = pending.slice(0, batchSize);
-  const remaining = Math.max(0, pending.length - toScan.length);
+
+  // Cover art is resolved against the whole library, not just this batch:
+  // a fully-scanned library has nothing pending, and art would otherwise
+  // never get filled in for it.
+  const libraryAppids = library.map((g) => g.appid);
+  await resolveMissingArt(libraryAppids);
+
+  const [artLeft] = await db
+    .select({ n: count() })
+    .from(games)
+    .where(and(inArray(games.appid, libraryAppids), isNull(games.artCheckedAt)));
+
+  // Keep the client looping while either kind of work is outstanding.
+  const remaining =
+    Math.max(0, pending.length - toScan.length) + (artLeft?.n ?? 0);
 
   let unlockedTotal = 0;
   let perfect = 0;

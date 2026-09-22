@@ -71,6 +71,25 @@ that:
 | Xbox | No official API; OpenXBL is the usual third-party route. |
 | Epic | **Not possible today.** EOS Web API only lets developers query their own titles; there is no consumer endpoint for a user's achievements. |
 
+## Planned
+
+Captured direction, not yet built:
+
+- **Ratings and reviews per game** — stars and comments in the Letterboxd
+  sense, with completion-time context closer to HowLongToBeat.
+- **Leaderboards** — 100% completions, rare-achievement counts, and similar
+  standings.
+- **Leaderboard filters** — world, region and friends, with a control that
+  jumps you to your own position rather than making you scroll for it.
+
+Two constraints these should respect, because they are what the product is
+for:
+
+1. Personalization stays sourced from games and earned achievements. No
+   uploads.
+2. Setup should cost a minute, not an evening. More expressive than
+   Letterboxd, but not a design tool.
+
 ## Known gap
 
 Steam exposes total playtime and unlock time, but never *playtime at the

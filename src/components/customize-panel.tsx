@@ -7,6 +7,7 @@ import {
   setAvatar,
   setBanner,
   setFavorites,
+  updateHandle,
   updateProfile,
 } from "@/lib/actions";
 import { ACCENT_PRESETS } from "@/lib/profile-presets";
@@ -22,6 +23,7 @@ interface Props {
     avatarAppid: number | null;
     avatarAchievementId: number | null;
     steamAvatarUrl: string | null;
+    handle: string | null;
     personaName: string;
   };
   games: PickerGame[];
@@ -40,6 +42,10 @@ export function CustomizePanel({
 
   const [accent, setAccent] = useState(user.accentColor);
   const [bio, setBio] = useState(user.bio ?? "");
+  const [handle, setHandle] = useState(user.handle ?? "");
+  const [handleMsg, setHandleMsg] = useState<{ ok: boolean; text: string } | null>(
+    null,
+  );
   const [banner, setBannerState] = useState(user.bannerAppid);
   const [avatarGame, setAvatarGame] = useState(user.avatarAppid);
   const [avatarAch, setAvatarAch] = useState(user.avatarAchievementId);
@@ -108,6 +114,50 @@ export function CustomizePanel({
       className="mt-8 space-y-10"
       style={{ ["--accent" as string]: accent }}
     >
+      {/* Handle ------------------------------------------------------- */}
+      <Block
+        title="Profile URL"
+        hint="Nobody wants to share a 17-digit account number."
+      >
+        <div className="flex flex-wrap items-start gap-2">
+          <div className="flex min-w-0 flex-1 items-center rounded-lg border border-border bg-panel px-3 py-2 focus-within:border-accent">
+            <span className="shrink-0 text-sm text-faint">/u/</span>
+            <input
+              value={handle}
+              onChange={(e) => {
+                setHandle(e.target.value);
+                setHandleMsg(null);
+              }}
+              placeholder="your-name"
+              maxLength={32}
+              className="w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-faint"
+            />
+          </div>
+          <button
+            onClick={() =>
+              startTransition(async () => {
+                const res = await updateHandle(handle);
+                setHandleMsg(
+                  res.ok ? { ok: true, text: "Saved." } : { ok: false, text: res.error },
+                );
+                if (res.ok) router.refresh();
+              })
+            }
+            disabled={pending || !handle.trim()}
+            className="rounded-lg border border-border-strong bg-raised px-4 py-2 text-sm font-medium transition-colors hover:border-accent disabled:opacity-60"
+          >
+            Save
+          </button>
+        </div>
+        {handleMsg && (
+          <p
+            className={`mt-2 text-xs ${handleMsg.ok ? "text-muted" : "text-orange-400"}`}
+          >
+            {handleMsg.text}
+          </p>
+        )}
+      </Block>
+
       {/* Identity ----------------------------------------------------- */}
       <Block
         title="About you"

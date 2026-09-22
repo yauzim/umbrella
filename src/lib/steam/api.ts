@@ -292,6 +292,52 @@ export function gameHeaderUrl(appid: number): string {
   return `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/header.jpg`;
 }
 
+/**
+ * Resolves a game's real header image.
+ *
+ * The classic `/steam/apps/<id>/header.jpg` path covers most of the back
+ * catalogue, but recent releases serve art from
+ * `store_item_assets/steam/apps/<id>/<content-hash>/header*.jpg`. The hash
+ * is not derivable from the appid, so for those we have to ask the store.
+ *
+ * Returns null when the game genuinely has no art we can use.
+ */
+export async function resolveHeaderImage(
+  appid: number,
+): Promise<string | null> {
+  const classic = gameHeaderUrl(appid);
+  try {
+    const head = await fetch(classic, { method: "HEAD", cache: "no-store" });
+    if (head.ok) return classic;
+  } catch {
+    // Network hiccup — fall through to the store lookup.
+  }
+
+  // The store endpoint is undocumented and rate limited (roughly 200 calls
+  // per five minutes per IP), so callers must throttle. It is only reached
+  // for the minority of games the cheap check could not resolve, and the
+  // answer is cached globally in `games`.
+  try {
+    const res = await fetch(
+      `https://store.steampowered.com/api/appdetails?appids=${appid}&filters=basic`,
+      { cache: "no-store", headers: { Accept: "application/json" } },
+    );
+    if (!res.ok) return null;
+
+    const body = (await res.json()) as Record<
+      string,
+      { success?: boolean; data?: { header_image?: string } } | undefined
+    >;
+    const entry = body[String(appid)];
+    if (!entry?.success || !entry.data?.header_image) return null;
+
+    // Strip the cache-busting timestamp so the stored URL stays stable.
+    return entry.data.header_image.split("?")[0];
+  } catch {
+    return null;
+  }
+}
+
 /** Run async work over a list with bounded concurrency. */
 export async function pooled<T, R>(
   items: T[],

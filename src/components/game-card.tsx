@@ -13,8 +13,8 @@ export function GameCard({ game }: { game: GameProgress }) {
     <article className="group overflow-hidden rounded-lg border border-border bg-panel transition-colors hover:border-border-strong">
       <div className="relative aspect-[460/215] bg-raised">
         <GameArt
-          appid={game.appid}
           name={game.name}
+          src={game.headerUrl}
           sizes="(max-width: 768px) 50vw, 260px"
         />
         {complete && (

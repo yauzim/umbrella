@@ -368,6 +368,19 @@ export async function resolveAvatarUrl(
   return user.avatarUrl;
 }
 
+/** Resolved cover art for one game, or null if it has none. */
+export async function getGameHeaderUrl(
+  appid: number | null,
+): Promise<string | null> {
+  if (!appid) return null;
+  const [row] = await db
+    .select({ headerUrl: games.headerUrl })
+    .from(games)
+    .where(eq(games.appid, appid))
+    .limit(1);
+  return row?.headerUrl ?? null;
+}
+
 export interface PickerGame {
   appid: number;
   name: string;

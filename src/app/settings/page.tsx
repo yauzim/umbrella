@@ -55,6 +55,7 @@ export default async function SettingsPage() {
           avatarAppid: user.avatarAppid,
           avatarAchievementId: user.avatarAchievementId,
           steamAvatarUrl: user.avatarUrl,
+          handle: user.handle,
           personaName: user.personaName,
         }}
         games={games}

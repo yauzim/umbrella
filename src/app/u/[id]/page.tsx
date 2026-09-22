@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { AchievementRow, AchievementTile } from "@/components/achievement-tile";
 import { GameCard } from "@/components/game-card";
 import { SyncButton } from "@/components/sync-button";
@@ -10,6 +10,7 @@ import {
   getLists,
   getPerfectGames,
   getProfileStats,
+  getGameHeaderUrl,
   getProfileUser,
   getRarestUnlocks,
   getRecentGames,
@@ -18,7 +19,6 @@ import {
 } from "@/lib/queries";
 import { formatPercent, formatUnlockDate } from "@/lib/rarity";
 import { getSession } from "@/lib/session";
-import { gameHeaderUrl } from "@/lib/steam/api";
 
 export default async function ProfilePage({
   params,
@@ -28,6 +28,12 @@ export default async function ProfilePage({
   const { id } = await params;
   const user = await getProfileUser(id);
   if (!user) notFound();
+
+  // Prefer the readable URL. Reaching the profile by SteamID still works
+  // (old links, no vanity name), but it hands over to /u/<handle>.
+  if (user.handle && id !== user.handle) {
+    redirect(`/u/${user.handle}`);
+  }
 
   const session = await getSession();
   const isOwner = session?.steamId === user.steamId;
@@ -54,9 +60,11 @@ export default async function ProfilePage({
     resolveAvatarUrl(user),
   ]);
 
-  const bannerUrl = user.bannerAppid
-    ? gameHeaderUrl(user.bannerAppid)
-    : (favorites[0]?.headerUrl ?? rarest[0]?.gameHeaderUrl ?? null);
+  const bannerUrl =
+    (await getGameHeaderUrl(user.bannerAppid)) ??
+    favorites[0]?.headerUrl ??
+    rarest[0]?.gameHeaderUrl ??
+    null;
 
   const neverSynced = user.librarySyncedAt === null;
   const hasApiKey = Boolean(process.env.STEAM_API_KEY);
@@ -88,7 +96,11 @@ export default async function ProfilePage({
 
       <div className="mx-auto max-w-6xl px-4 pb-24 sm:px-6">
         {/* Identity --------------------------------------------------- */}
-        <header className="-mt-10 flex flex-col gap-4 sm:-mt-12 sm:flex-row sm:items-end sm:gap-5">
+        {/* `relative z-10` is load-bearing: the banner above is positioned,
+            and positioned elements paint over static ones whatever the DOM
+            order, so without this the banner's gradient covers the top of
+            the avatar that is meant to overlap it. */}
+        <header className="relative z-10 -mt-10 flex flex-col gap-4 sm:-mt-12 sm:flex-row sm:items-end sm:gap-5">
           <div className="flex items-end gap-4">
             {/* Always rendered, even without art: it is what gives the
                 header its height, so an empty avatar would otherwise pull

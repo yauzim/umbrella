@@ -13,6 +13,7 @@ import {
 } from "@/db/schema";
 import { ACCENT_PRESETS } from "@/lib/profile-presets";
 import { getSession } from "@/lib/session";
+import { normalizeHandle } from "@/lib/steam/sync";
 
 /**
  * Server Functions are reachable by direct POST, not only through our UI,
@@ -26,6 +27,50 @@ async function requireSteamId(): Promise<string> {
 }
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
+
+/** Reserved so a handle can never shadow a route or a SteamID. */
+const RESERVED_HANDLES = new Set([
+  "settings",
+  "api",
+  "u",
+  "login",
+  "logout",
+  "admin",
+  "about",
+  "new",
+  "me",
+]);
+
+export async function updateHandle(raw: string): Promise<
+  { ok: true; handle: string } | { ok: false; error: string }
+> {
+  const steamId = await requireSteamId();
+
+  const handle = normalizeHandle(raw);
+  if (!handle) {
+    return {
+      ok: false,
+      error:
+        "3–32 characters, letters, numbers, dashes and underscores. Cannot be all digits.",
+    };
+  }
+  if (RESERVED_HANDLES.has(handle)) {
+    return { ok: false, error: "That name is reserved." };
+  }
+
+  const [taken] = await db
+    .select({ steamId: users.steamId })
+    .from(users)
+    .where(eq(users.handle, handle))
+    .limit(1);
+  if (taken && taken.steamId !== steamId) {
+    return { ok: false, error: "That name is already taken." };
+  }
+
+  await db.update(users).set({ handle }).where(eq(users.steamId, steamId));
+  revalidatePath(`/u/${handle}`);
+  return { ok: true, handle };
+}
 
 export async function updateProfile(formData: FormData) {
   const steamId = await requireSteamId();
