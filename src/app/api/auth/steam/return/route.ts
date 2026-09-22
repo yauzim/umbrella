@@ -23,14 +23,26 @@ export async function GET(request: NextRequest) {
     .limit(1);
 
   if (!existing) {
-    const summary = await getPlayerSummary(steamId);
+    // Steam has already proved who this is, so the sign-in itself must not
+    // depend on the Web API. A missing key or a Steam outage should leave
+    // the user logged in with a sparse profile, not a 500 on the way back.
+    let summary: Awaited<ReturnType<typeof getPlayerSummary>> = null;
+    try {
+      summary = await getPlayerSummary(steamId);
+    } catch (err) {
+      console.warn(
+        `[auth] Could not fetch Steam profile for ${steamId}; continuing with a placeholder.`,
+        err instanceof Error ? err.message : err,
+      );
+    }
+
     await db
       .insert(users)
       .values({
         steamId,
-        personaName: summary?.personaname ?? steamId,
+        personaName: summary?.personaname ?? `Steam user ${steamId.slice(-6)}`,
         avatarUrl: summary?.avatarfull ?? null,
-        profileUrl: summary?.profileurl ?? null,
+        profileUrl: summary?.profileurl ?? `https://steamcommunity.com/profiles/${steamId}`,
       })
       .onConflictDoNothing()
       .run();

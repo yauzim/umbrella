@@ -43,6 +43,9 @@ export default async function ProfilePage({
     : (rarest[0]?.gameHeaderUrl ?? null);
 
   const neverSynced = user.librarySyncedAt === null;
+  // Without a key nothing can be fetched, so say so plainly rather than
+  // letting the sync fail with a stack trace.
+  const hasApiKey = Boolean(process.env.STEAM_API_KEY);
 
   return (
     <div
@@ -114,7 +117,7 @@ export default async function ProfilePage({
             )}
           </div>
 
-          {isOwner && <SyncButton autoStart={neverSynced} />}
+          {isOwner && hasApiKey && <SyncButton autoStart={neverSynced} />}
         </header>
 
         {/* Stats ------------------------------------------------------ */}
@@ -143,6 +146,29 @@ export default async function ProfilePage({
             }
           />
         </section>
+
+        {isOwner && !hasApiKey && (
+          <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+            <p className="font-medium">
+              Signed in — but no Steam API key is configured.
+            </p>
+            <p className="mt-1 text-amber-200/80">
+              Achievements cannot be fetched until one is set. Get a key at{" "}
+              <a
+                className="underline underline-offset-2"
+                href="https://steamcommunity.com/dev/apikey"
+                target="_blank"
+                rel="noreferrer"
+              >
+                steamcommunity.com/dev/apikey
+              </a>
+              , add it to{" "}
+              <code className="rounded bg-black/30 px-1">.env.local</code> as{" "}
+              <code className="rounded bg-black/30 px-1">STEAM_API_KEY</code>,
+              then restart the dev server.
+            </p>
+          </div>
+        )}
 
         {user.profileIsPrivate && (
           <p className="mt-4 rounded-lg border border-orange-500/30 bg-orange-500/10 px-4 py-3 text-sm text-orange-300">
