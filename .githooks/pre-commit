@@ -1,0 +1,62 @@
+#!/bin/sh
+#
+# Blocks secrets from ever reaching a commit.
+#
+# Enable once per clone:
+#   git config core.hooksPath .githooks
+#
+# Bypass deliberately (you had better be sure):
+#   git commit --no-verify
+
+fail() {
+  echo ""
+  echo "  COMMIT BLOCKED: $1"
+  echo ""
+  echo "  Unstage it with:  git restore --staged <file>"
+  echo "  Override with:    git commit --no-verify   (only if it is a false positive)"
+  echo ""
+  exit 1
+}
+
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$staged" ] && exit 0
+
+# --- 1. Files that must never be committed -------------------------------
+for f in $staged; do
+  case "$f" in
+    .env.example) ;;                       # the template is the one allowed
+    .env|.env.*|*/.env|*/.env.*)
+      fail "$f is an environment file and may hold real keys." ;;
+    *.db|*.db-wal|*.db-shm|*.sqlite|*.sqlite3)
+      fail "$f is a database file; it can contain user data." ;;
+    *.pem|*.key|*.pfx|*.p12)
+      fail "$f looks like a private key or certificate." ;;
+  esac
+done
+
+# --- 2. Secret-shaped content in the staged diff -------------------------
+# Only added lines (^+), so pre-existing text never re-triggers.
+added=$(git diff --cached -U0 | grep "^+" | grep -v "^+++")
+[ -z "$added" ] && exit 0
+
+check() {
+  # `--` so a pattern starting with a dash is not read as a grep option.
+  if printf '%s\n' "$added" | grep -qE -- "$1"; then
+    fail "$2"
+  fi
+}
+
+check '(gh[pousr]_[A-Za-z0-9]{30,})'            "a GitHub token is in the staged changes."
+check 'xox[baprs]-[A-Za-z0-9-]{10,}'            "a Slack token is in the staged changes."
+check 'AKIA[0-9A-Z]{16}'                        "an AWS access key is in the staged changes."
+check '\-\-\-\-\-BEGIN [A-Z ]*PRIVATE KEY'      "a private key block is in the staged changes."
+
+# A populated secret assignment. Empty values (the .env.example shape) pass.
+check '(STEAM_API_KEY|SESSION_SECRET|CLIENT_SECRET|NPSSO)[[:space:]]*=[[:space:]]*[^[:space:]"'"'"']+' \
+  "a secret looks like it has a real value assigned."
+
+# Steam Web API keys are exactly 32 uppercase hex characters.
+check '\b[0-9A-F]{32}\b' \
+  "a 32-char uppercase hex string is present — that is the shape of a Steam API key."
+
+exit 0

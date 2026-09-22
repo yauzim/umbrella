@@ -11,8 +11,14 @@ timeline later.
 
 ```bash
 npm install
+git config core.hooksPath .githooks   # enable the secret-blocking hook
 cp .env.example .env.local
 ```
+
+That hook is per-clone and not automatic — Git will not run hooks from a
+fresh clone until you point it at them. It refuses any commit containing an
+env file, a database file, a private key, or token-shaped content (including
+the 32-char uppercase hex of a Steam Web API key).
 
 Fill in `.env.local`:
 
