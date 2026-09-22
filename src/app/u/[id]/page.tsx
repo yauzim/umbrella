@@ -53,7 +53,7 @@ export default async function ProfilePage({
       style={{ ["--accent" as string]: user.accentColor }}
     >
       {/* Banner ------------------------------------------------------- */}
-      <div className="relative h-40 overflow-hidden border-b border-border sm:h-52">
+      <div className="relative h-28 overflow-hidden border-b border-border sm:h-36">
         {bannerUrl ? (
           <Image
             src={bannerUrl}
@@ -88,6 +88,9 @@ export default async function ProfilePage({
                 alt=""
                 width={112}
                 height={112}
+                // Above the fold and the page's identity: lazy-loading it
+                // leaves an empty box on every first paint.
+                priority
                 className="size-full object-cover"
                 unoptimized
               />

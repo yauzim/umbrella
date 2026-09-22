@@ -30,12 +30,23 @@ const RARITY_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 /** Steam tolerates parallel reads, but there is no reason to be rude. */
 const CONCURRENCY = 4;
 
+/**
+ * Games scanned per request. A first-time sync of a 300-game library is
+ * ~700 Steam calls; doing that in one HTTP request means a multi-minute
+ * connection that loses everything if it drops. Batching keeps each
+ * request short and commits progress as it goes, so a failure costs one
+ * batch rather than the whole scan.
+ */
+const DEFAULT_BATCH = 25;
+
 export interface SyncReport {
   steamId: string;
   private: boolean;
   gamesTotal: number;
   gamesScanned: number;
   gamesSkipped: number;
+  /** Games still awaiting a scan. Non-zero means: call again. */
+  remaining: number;
   achievementsUnlocked: number;
   perfectGames: number;
   durationMs: number;
@@ -54,6 +65,21 @@ async function syncProfileAndLibrary(steamId: string) {
   const isPrivate = owned === null;
   const library = owned ?? [];
   const now = new Date();
+
+  // Playtimes we already hold. A batched sync calls this once per batch, so
+  // without comparing first, a ten-batch scan would write ten identical
+  // snapshot rows per game and pollute the very history they exist to keep.
+  const priorPlaytime = new Map(
+    (
+      await db
+        .select({
+          appid: userGames.appid,
+          playtimeForever: userGames.playtimeForever,
+        })
+        .from(userGames)
+        .where(eq(userGames.steamId, steamId))
+    ).map((r) => [r.appid, r.playtimeForever]),
+  );
 
   db.transaction((tx) => {
     tx.insert(users)
@@ -116,9 +142,9 @@ async function syncProfileAndLibrary(steamId: string) {
         .run();
 
       // Snapshot playtime so "unlocked at hour 62" becomes possible later.
-      // Only for games actually played — otherwise we write thousands of
-      // identical zero rows on every sync.
-      if (g.playtime_forever > 0) {
+      // Only for played games, and only when the number actually moved.
+      const prior = priorPlaytime.get(g.appid);
+      if (g.playtime_forever > 0 && prior !== g.playtime_forever) {
         tx.insert(playtimeSnapshots)
           .values({
             steamId,
@@ -335,7 +361,10 @@ async function syncGameAchievements(
 
 export async function syncUser(
   steamId: string,
-  { force = false }: { force?: boolean } = {},
+  {
+    force = false,
+    batchSize = DEFAULT_BATCH,
+  }: { force?: boolean; batchSize?: number } = {},
 ): Promise<SyncReport> {
   const started = Date.now();
   const errors: string[] = [];
@@ -349,6 +378,7 @@ export async function syncUser(
       gamesTotal: 0,
       gamesScanned: 0,
       gamesSkipped: 0,
+      remaining: 0,
       achievementsUnlocked: 0,
       perfectGames: 0,
       durationMs: Date.now() - started,
@@ -360,25 +390,32 @@ export async function syncUser(
   // turns a 900-game library into ~200 calls instead of 900.
   const candidates = library.filter((g) => (g.playtime_forever ?? 0) > 0);
 
-  const staleCutoff = new Date(Date.now() - 6 * 60 * 60 * 1000);
-  const alreadyFresh = force
-    ? new Set<number>()
-    : new Set(
-        (
-          await db
-            .select({ appid: userGames.appid })
-            .from(userGames)
-            .where(
-              and(
-                eq(userGames.steamId, steamId),
-                isNotNull(userGames.achievementsSyncedAt),
-                gt(userGames.achievementsSyncedAt, staleCutoff),
-              ),
-            )
-        ).map((r) => r.appid),
-      );
+  // A forced re-sync still needs to advance through its batches, so it uses
+  // a short window rather than none at all. With no window, every batch
+  // would re-scan the same first `batchSize` games and never finish.
+  const freshnessMs = force ? 2 * 60 * 1000 : 6 * 60 * 60 * 1000;
+  const staleCutoff = new Date(Date.now() - freshnessMs);
+  const alreadyFresh = new Set(
+    (
+      await db
+        .select({ appid: userGames.appid })
+        .from(userGames)
+        .where(
+          and(
+            eq(userGames.steamId, steamId),
+            isNotNull(userGames.achievementsSyncedAt),
+            gt(userGames.achievementsSyncedAt, staleCutoff),
+          ),
+        )
+    ).map((r) => r.appid),
+  );
 
-  const toScan = candidates.filter((g) => !alreadyFresh.has(g.appid));
+  // Everything still owed a scan, of which we take one batch now. Progress
+  // is durable because each game stamps its own achievementsSyncedAt, so
+  // the next call naturally picks up where this one stopped.
+  const pending = candidates.filter((g) => !alreadyFresh.has(g.appid));
+  const toScan = pending.slice(0, batchSize);
+  const remaining = Math.max(0, pending.length - toScan.length);
 
   let unlockedTotal = 0;
   let perfect = 0;
@@ -404,7 +441,8 @@ export async function syncUser(
     private: false,
     gamesTotal: library.length,
     gamesScanned: scanned,
-    gamesSkipped: library.length - toScan.length,
+    gamesSkipped: library.length - pending.length,
+    remaining,
     achievementsUnlocked: unlockedTotal,
     perfectGames: perfect,
     durationMs: Date.now() - started,
