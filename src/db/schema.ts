@@ -243,6 +243,45 @@ export const favoriteGames = sqliteTable(
 );
 
 /* ---------------------------------------------------------------
+ * REVIEWS
+ * Stars and words on a game, Letterboxd-style. Rating is stored as
+ * half-stars (1–10) rather than a float, so "three and a half" is an
+ * exact value and averages stay honest.
+ * ------------------------------------------------------------- */
+
+export const MAX_RATING = 10; // 10 half-stars = 5 stars
+
+export const gameReviews = sqliteTable(
+  "game_reviews",
+  {
+    steamId: text("steam_id")
+      .notNull()
+      .references(() => users.steamId, { onDelete: "cascade" }),
+    appid: integer("appid")
+      .notNull()
+      .references(() => games.appid, { onDelete: "cascade" }),
+    /** 1–10 half-stars, or null for a review with words but no score. */
+    rating: integer("rating"),
+    body: text("body"),
+    /** Marks a review that gives away endings or achievement solutions. */
+    containsSpoilers: integer("contains_spoilers", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [
+    primaryKey({ columns: [t.steamId, t.appid] }),
+    index("reviews_game_idx").on(t.appid, t.createdAt),
+    index("reviews_author_idx").on(t.steamId),
+  ],
+);
+
+/* ---------------------------------------------------------------
  * SHOWCASES
  * An ordered set of blocks the user arranges on their profile. Steam
  * gives you a fixed grid; this is the part that was missing. `config`

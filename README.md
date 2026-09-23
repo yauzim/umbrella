@@ -75,14 +75,26 @@ that:
 
 Captured direction, not yet built:
 
-- **Ratings and reviews per game** — stars and comments in the Letterboxd
-  sense, with completion-time context closer to HowLongToBeat.
-- **List editing** — the `lists` and `list_items` tables exist but nothing
-  writes to them yet. This is the backlog / currently-hunting half.
+Nothing outstanding from the original notes — ratings, reviews, lists and
+leaderboards all shipped. Natural next steps: a second platform
+(RetroAchievements), and an activity feed of what people you follow have
+been unlocking.
 
-Built since: leaderboards (`/leaderboard`) rank completions, rare unlocks
-and total achievements, scoped to world, region or Steam friends, with a
-jump-to-my-position control.
+Built so far beyond the profile:
+
+- **Game pages** (`/game/<appid>`) — half-star ratings, written reviews
+  with a spoiler blur, every achievement rarest-first with your unlock
+  state, and who else here has played it.
+- **Completion context** — median hours to 100%, median hours played and
+  average completion, computed from this instance's own players. Median
+  rather than mean, because one idler at 900 hours would make a 20-hour
+  game look like a career. Says so explicitly when the sample is tiny.
+- **Lists** — Backlog and Currently hunting are created on demand; custom
+  lists can be made from any game page. Reorderable when ranked, per-item
+  notes, public or private.
+- **Leaderboards** (`/leaderboard`) — completions, rare unlocks and total
+  achievements, scoped to world, region or Steam friends, with a
+  jump-to-my-position control.
 
 Region depends on `loccountrycode`, which Steam only returns for a public
 profile that has a country set — so when it is missing the page says how to

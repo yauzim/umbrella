@@ -322,9 +322,10 @@ export default async function ProfilePage({
           <Section title="Lists">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {lists.map((l) => (
-                <div
+                <Link
                   key={l.id}
-                  className="rounded-lg border border-border bg-panel p-4"
+                  href={`/u/${user.handle ?? user.steamId}/lists/${l.slug}`}
+                  className="block rounded-lg border border-border bg-panel p-4 transition-colors hover:border-border-strong"
                 >
                   <h3 className="font-medium">{l.name}</h3>
                   {l.description && (
@@ -335,7 +336,7 @@ export default async function ProfilePage({
                   <p className="tnum mt-2 text-xs text-faint">
                     {l.itemCount} {l.itemCount === 1 ? "game" : "games"}
                   </p>
-                </div>
+                </Link>
               ))}
             </div>
           </Section>

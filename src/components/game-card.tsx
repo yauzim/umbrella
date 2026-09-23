@@ -1,8 +1,34 @@
+import Link from "next/link";
 import { GameArt } from "@/components/game-art";
 import { formatPlaytime } from "@/lib/rarity";
 import type { GameProgress } from "@/lib/queries";
 
-export function GameCard({ game }: { game: GameProgress }) {
+const SHELL =
+  "group block overflow-hidden rounded-lg border border-border bg-panel transition-colors hover:border-border-strong";
+
+/**
+ * `linked` is opt-out because a few callers wrap the card in their own
+ * anchor, and nested anchors are invalid HTML that break clicks.
+ */
+export function GameCard({
+  game,
+  linked = true,
+}: {
+  game: GameProgress;
+  linked?: boolean;
+}) {
+  const body = <CardBody game={game} />;
+
+  return linked ? (
+    <Link href={`/game/${game.appid}`} className={SHELL}>
+      {body}
+    </Link>
+  ) : (
+    <div className={SHELL}>{body}</div>
+  );
+}
+
+function CardBody({ game }: { game: GameProgress }) {
   const pct =
     game.achievementCount > 0
       ? Math.min(100, (game.unlockedCount / game.achievementCount) * 100)
@@ -10,7 +36,7 @@ export function GameCard({ game }: { game: GameProgress }) {
   const complete = pct >= 100;
 
   return (
-    <article className="group overflow-hidden rounded-lg border border-border bg-panel transition-colors hover:border-border-strong">
+    <>
       <div className="relative aspect-[460/215] bg-raised">
         <GameArt
           name={game.name}
@@ -34,7 +60,9 @@ export function GameCard({ game }: { game: GameProgress }) {
             className="h-full rounded-full transition-[width]"
             style={{
               width: `${pct}%`,
-              backgroundColor: complete ? "var(--accent)" : "var(--border-strong)",
+              backgroundColor: complete
+                ? "var(--accent)"
+                : "var(--border-strong)",
             }}
           />
         </div>
@@ -46,6 +74,6 @@ export function GameCard({ game }: { game: GameProgress }) {
           <span>{formatPlaytime(game.playtimeForever)}</span>
         </div>
       </div>
-    </article>
+    </>
   );
 }
