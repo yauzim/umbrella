@@ -4,7 +4,7 @@ import { formatPlaytime } from "@/lib/rarity";
 import type { GameProgress } from "@/lib/queries";
 
 const SHELL =
-  "group block overflow-hidden rounded-lg border border-border bg-panel transition-colors hover:border-border-strong";
+  "group block overflow-hidden rounded-lg border border-border bg-panel panel-raised transition-colors hover:border-border-strong";
 
 /**
  * `linked` is opt-out because a few callers wrap the card in their own

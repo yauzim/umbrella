@@ -1,44 +1,62 @@
 /**
  * Seeds a clearly-labelled demo profile so the UI can be developed without
- * burning Steam API calls (or needing a key at all).
+ * a Steam key.
  *
- * Game names and appids are real so the CDN art loads; the unlocks and
- * rarity figures are invented. This is a fixture, not Steam data.
+ * IMPORTANT: this uses a reserved fake appid range, never real ones.
  *
- *   node scripts/seed-demo.mjs
+ * An earlier version seeded synthetic achievements against real appids
+ * (Elden Ring, Hollow Knight…). That corrupted real game pages two ways:
+ * invented achievements appeared alongside genuine ones, and because the
+ * seed also stamped `schema_synced_at`, the real sync treated those games
+ * as cached and never fetched their actual Steam schemas. Keeping fixtures
+ * in their own id range makes that class of bug impossible.
+ *
+ *   node scripts/seed-demo.mjs          # add fixtures
+ *   node scripts/seed-demo.mjs --clean  # remove them
  */
 import Database from "better-sqlite3";
 
 const DEMO_STEAM_ID = "76561190000000001";
+/** Real Steam appids are well below this; nothing here can collide. */
+const FAKE_APPID_BASE = 900000001;
+
 const db = new Database(process.env.DATABASE_URL ?? "./umbrella.db");
 db.pragma("foreign_keys = ON");
 
 const secs = (d) => Math.floor(d.getTime() / 1000);
 const daysAgo = (n) => new Date(Date.now() - n * 86400000);
 
+if (process.argv.includes("--clean")) {
+  db.exec("BEGIN");
+  db.prepare("DELETE FROM users WHERE steam_id = ?").run(DEMO_STEAM_ID);
+  db.prepare("DELETE FROM games WHERE appid >= ?").run(FAKE_APPID_BASE);
+  db.exec("COMMIT");
+  console.log("Demo fixtures removed.");
+  process.exit(0);
+}
+
+// Names are invented too — no real game's page can be affected.
 const GAMES = [
-  { appid: 367520, name: "Hollow Knight", total: 63, done: 63, mins: 7420 },
-  { appid: 504230, name: "Celeste", total: 42, done: 42, mins: 3110 },
-  { appid: 1145360, name: "Hades", total: 49, done: 49, mins: 5980 },
-  { appid: 1245620, name: "ELDEN RING", total: 42, done: 31, mins: 12400 },
-  { appid: 374320, name: "DARK SOULS III", total: 43, done: 28, mins: 8830 },
-  { appid: 105600, name: "Terraria", total: 115, done: 88, mins: 15200 },
-  { appid: 620, name: "Portal 2", total: 51, done: 44, mins: 1890 },
-  { appid: 413150, name: "Stardew Valley", total: 40, done: 22, mins: 6600 },
+  { name: "Hollow Reverie (demo)", total: 63, done: 63, mins: 7420 },
+  { name: "Summit Dash (demo)", total: 42, done: 42, mins: 3110 },
+  { name: "Underworld Run (demo)", total: 49, done: 49, mins: 5980 },
+  { name: "Ashen Realm (demo)", total: 42, done: 31, mins: 12400 },
+  { name: "Cinder Souls (demo)", total: 43, done: 28, mins: 8830 },
+  { name: "Pixel Frontier (demo)", total: 115, done: 88, mins: 15200 },
+  { name: "Test Chamber (demo)", total: 51, done: 44, mins: 1890 },
+  { name: "Harvest Vale (demo)", total: 40, done: 22, mins: 6600 },
 ];
 
-// Spread across every rarity tier so the visual language is exercised.
 const NOTABLE = [
-  [367520, "Steel Soul", "Complete the game in Steel Soul mode.", 0.4],
-  [367520, "Pantheon of Hallownest", "Defeat the Pantheon of Hallownest.", 0.7],
-  [504230, "Golden Strawberry", "Complete a chapter without dying.", 1.9],
-  [1145360, "Hell Mode", "Clear an escape attempt on Hell Mode.", 3.2],
-  [1245620, "Elden Lord", "Obtain the Elden Lord ending.", 12.4],
-  [374320, "The Usurper", "Reach the Usurpation of Fire ending.", 18.1],
-  [105600, "Bulldozer", "Break every kind of block.", 31.5],
-  [620, "Professor Portal", "Complete all test chambers.", 46.8],
-  [413150, "Fector's Challenge", "Score 50,000 points in Journey of the Prairie King.", 2.1],
-  [1145360, "Is There No Escape?", "Escape the Underworld for the first time.", 58.0],
+  [0, "Steel Soul", "Finish in a single life.", 0.4],
+  [0, "Full Pantheon", "Defeat every boss consecutively.", 0.7],
+  [1, "Golden Berry", "Clear a chapter without dying.", 1.9],
+  [2, "Hell Mode", "Clear a run on the hardest setting.", 3.2],
+  [3, "Realm Lord", "Reach the true ending.", 12.4],
+  [4, "The Usurper", "Reach the hidden ending.", 18.1],
+  [5, "Bulldozer", "Break every kind of block.", 31.5],
+  [6, "Professor", "Complete every test chamber.", 46.8],
+  [7, "Arcade Champion", "Score 50,000 in the minigame.", 2.1],
 ];
 
 db.exec("BEGIN");
@@ -54,17 +72,18 @@ try {
     null,
     null,
     "demo",
-    "Local fixture account — every unlock below is invented, not Steam data.",
+    "Local fixture account — every game and unlock here is invented.",
     "#f5a524",
-    367520,
+    null,
     "dark",
     secs(daysAgo(400)),
     secs(new Date()),
   );
 
   const insGame = db.prepare(
-    `INSERT INTO games (appid, name, icon_url, header_url, has_achievements, achievement_count, schema_synced_at, rarity_synced_at)
-     VALUES (?,?,?,?,1,?,?,?)
+    `INSERT INTO games (appid, name, icon_url, header_url, hero_url, logo_url,
+       has_achievements, achievement_count, schema_synced_at, rarity_synced_at, art_checked_at)
+     VALUES (?,?,NULL,NULL,NULL,NULL,1,?,?,?,?)
      ON CONFLICT(appid) DO UPDATE SET achievement_count = excluded.achievement_count`,
   );
   const insUserGame = db.prepare(
@@ -86,47 +105,36 @@ try {
   const now = secs(new Date());
   let day = 5;
 
-  for (const g of GAMES) {
-    insGame.run(
-      g.appid,
-      g.name,
-      null,
-      `https://cdn.cloudflare.steamstatic.com/steam/apps/${g.appid}/header.jpg`,
-      g.total,
-      now,
-      now,
-    );
-    insUserGame.run(
-      DEMO_STEAM_ID,
-      g.appid,
-      g.mins,
-      secs(daysAgo(day)),
-      g.done,
-      now,
-    );
+  GAMES.forEach((g, gi) => {
+    const appid = FAKE_APPID_BASE + gi;
+    insGame.run(appid, g.name, g.total, now, now, now);
+    insUserGame.run(DEMO_STEAM_ID, appid, g.mins, secs(daysAgo(day)), g.done, now);
 
-    // Filler achievements so counts and completion percentages are real.
     for (let i = 0; i < g.total; i++) {
-      const isDone = i < g.done;
       const { id } = insAch.get(
-        g.appid,
-        `ACH_${g.appid}_${i}`,
+        appid,
+        `DEMO_${appid}_${i}`,
         `${g.name} milestone ${i + 1}`,
         null,
-        // Plausible long-tail rarity curve.
         Math.round((90 / (i + 1.4) + 2) * 10) / 10,
       );
-      if (isDone) {
-        insUnlock.run(DEMO_STEAM_ID, id, g.appid, secs(daysAgo(day + i * 2)));
+      if (i < g.done) {
+        insUnlock.run(DEMO_STEAM_ID, id, appid, secs(daysAgo(day + i * 2)));
       }
     }
     day += 22;
-  }
+  });
 
-  // Named showcase pieces, overwriting the filler at the rare end.
   let offset = 3;
-  for (const [appid, name, desc, percent] of NOTABLE) {
-    const { id } = insAch.get(appid, `ACH_NOTABLE_${name.replace(/\W+/g, "_")}`, name, desc, percent);
+  for (const [gameIndex, name, desc, percent] of NOTABLE) {
+    const appid = FAKE_APPID_BASE + gameIndex;
+    const { id } = insAch.get(
+      appid,
+      `DEMO_NOTABLE_${name.replace(/\W+/g, "_")}`,
+      name,
+      desc,
+      percent,
+    );
     insUnlock.run(DEMO_STEAM_ID, id, appid, secs(daysAgo(offset)));
     offset += 17;
   }
@@ -140,4 +148,5 @@ try {
 const n = db
   .prepare("SELECT count(*) AS n FROM user_achievements WHERE steam_id = ?")
   .get(DEMO_STEAM_ID).n;
-console.log(`Seeded demo profile: ${n} unlocks. Visit /u/demo`);
+console.log(`Seeded demo profile: ${n} unlocks on fixture games. Visit /u/demo`);
+console.log("Remove with: node scripts/seed-demo.mjs --clean");

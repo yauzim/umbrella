@@ -47,8 +47,30 @@ To work on the UI without a Steam key:
 node scripts/seed-demo.mjs   # then visit /u/demo
 ```
 
-Game names and appids are real so the CDN art loads; the unlocks and rarity
-figures are invented.
+Remove it with `node scripts/seed-demo.mjs --clean`.
+
+Fixtures live in a reserved appid range (≥ 900000001) with invented game
+names. An earlier version seeded against real appids, which corrupted real
+game pages twice over: invented achievements appeared beside genuine ones,
+and because the seed stamped `schema_synced_at`, the real sync treated
+those games as cached and never fetched their true Steam schemas. Keep
+fixtures in their own id range.
+
+## Earned decoration
+
+Steam's Points Shop sells avatar frames and profile backgrounds. Here the
+same richness is earned rather than bought, which is the whole premise:
+
+- **Backgrounds** use `library_hero.jpg`, the 1920×620 art Valve produces
+  to sit behind a page, with the game's transparent `logo.png` composited
+  over it. Both come from a game in your own library. A stretched 460×215
+  `header.jpg` was what made the old profile look flat.
+- **Avatar frames** are determined by the rarest achievement you hold —
+  Verdant under 50%, Azure under 20%, Amethyst under 5%, Gilded under 1%,
+  Mythic under 0.5%. The top three rotate. The ring is a claim anyone can
+  verify by scrolling to your rarest unlocks.
+
+Nothing is purchasable and nothing is uploadable.
 
 ## How it stays inside the API budget
 

@@ -13,6 +13,8 @@ export interface GameDetail {
   appid: number;
   name: string;
   headerUrl: string | null;
+  heroUrl: string | null;
+  logoUrl: string | null;
   achievementCount: number;
 }
 
@@ -22,6 +24,8 @@ export async function getGame(appid: number): Promise<GameDetail | null> {
       appid: games.appid,
       name: games.name,
       headerUrl: games.headerUrl,
+      heroUrl: games.heroUrl,
+      logoUrl: games.logoUrl,
       achievementCount: games.achievementCount,
     })
     .from(games)

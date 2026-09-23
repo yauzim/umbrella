@@ -27,7 +27,7 @@ import {
   getPlayerAchievements,
   getPlayerSummary,
   getSchemaForGame,
-  resolveHeaderImage,
+  resolveGameArt,
   pooled,
 } from "./api";
 
@@ -313,9 +313,14 @@ async function resolveMissingArt(appids: number[]): Promise<void> {
 
   await pooled(unchecked, ART_CONCURRENCY, async ({ appid }) => {
     try {
-      const url = await resolveHeaderImage(appid);
+      const art = await resolveGameArt(appid);
       db.update(games)
-        .set({ headerUrl: url, artCheckedAt: new Date() })
+        .set({
+          headerUrl: art.header,
+          heroUrl: art.hero,
+          logoUrl: art.logo,
+          artCheckedAt: new Date(),
+        })
         .where(eq(games.appid, appid))
         .run();
     } catch {

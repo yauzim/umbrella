@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AchievementRow, AchievementTile } from "@/components/achievement-tile";
+import { AvatarFrame } from "@/components/avatar-frame";
 import { GameCard } from "@/components/game-card";
 import { SyncButton } from "@/components/sync-button";
 import {
@@ -10,13 +11,14 @@ import {
   getLists,
   getPerfectGames,
   getProfileStats,
-  getGameHeaderUrl,
+  getBannerArt,
   getProfileUser,
   getRarestUnlocks,
   getRecentGames,
   getTimeline,
   resolveAvatarUrl,
 } from "@/lib/queries";
+import { frameFor } from "@/lib/frames";
 import { formatPercent, formatUnlockDate } from "@/lib/rarity";
 import { getSession } from "@/lib/session";
 
@@ -60,11 +62,11 @@ export default async function ProfilePage({
     resolveAvatarUrl(user),
   ]);
 
-  const bannerUrl =
-    (await getGameHeaderUrl(user.bannerAppid)) ??
-    favorites[0]?.headerUrl ??
-    rarest[0]?.gameHeaderUrl ??
-    null;
+  const banner = await getBannerArt(
+    user.bannerAppid,
+    favorites[0]?.appid ?? rarest[0]?.appid ?? null,
+  );
+  const frame = frameFor(stats.rarestPercent);
 
   const neverSynced = user.librarySyncedAt === null;
   const hasApiKey = Boolean(process.env.STEAM_API_KEY);
@@ -75,23 +77,44 @@ export default async function ProfilePage({
       style={{ ["--accent" as string]: user.accentColor }}
     >
       {/* Banner ------------------------------------------------------- */}
-      <div className="relative h-28 overflow-hidden border-b border-border sm:h-36">
-        {bannerUrl ? (
+      {/* Hero art (1920x620) rather than a stretched header thumbnail, and
+          shown at real opacity — the point of choosing a game is seeing it.
+          Legibility comes from the scrims below, not from blurring the art
+          into mush. */}
+      <div className="relative h-52 overflow-hidden border-b border-border sm:h-72">
+        {banner.hero || banner.header ? (
           <Image
-            src={bannerUrl}
+            src={banner.hero ?? banner.header!}
             alt=""
             fill
             sizes="100vw"
             priority
-            className="scale-110 object-cover opacity-40 blur-[2px]"
+            className="object-cover object-[center_30%]"
             unoptimized
           />
         ) : (
           <div className="absolute inset-0 bg-panel" />
         )}
-        {/* Opaque at the base so the identity block below always lands on a
-            flat ground, whatever the cover art happens to be doing. */}
-        <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/85 to-transparent" />
+
+        {/* Vertical scrim carries the art into the page background; the
+            horizontal one keeps the left column readable over busy art. */}
+        <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/60 to-bg/10" />
+        <div className="absolute inset-0 bg-gradient-to-r from-bg/80 via-transparent to-transparent" />
+
+        {/* The game's own wordmark, composited the way Steam's library
+            does it. Absent for very new releases, so it is optional. */}
+        {banner.logo && (
+          <div className="pointer-events-none absolute bottom-4 right-4 hidden h-16 w-48 opacity-70 sm:block">
+            <Image
+              src={banner.logo}
+              alt=""
+              fill
+              sizes="192px"
+              className="object-contain object-right-bottom drop-shadow-lg"
+              unoptimized
+            />
+          </div>
+        )}
       </div>
 
       <div className="mx-auto max-w-6xl px-4 pb-24 sm:px-6">
@@ -105,44 +128,55 @@ export default async function ProfilePage({
             {/* Always rendered, even without art: it is what gives the
                 header its height, so an empty avatar would otherwise pull
                 the name up into the banner where it is unreadable. */}
-            <div
-              className="size-20 shrink-0 overflow-hidden rounded-2xl border-4 border-bg bg-raised sm:size-28"
-              style={{ outline: `2px solid ${user.accentColor}` }}
-            >
-              {avatarUrl ? (
-                <Image
-                  src={avatarUrl}
-                  alt=""
-                  width={112}
-                  height={112}
-                  // Above the fold and the page's identity: lazy-loading it
-                  // leaves an empty box on every first paint.
-                  priority
-                  className="size-full object-cover"
-                  unoptimized
-                />
-              ) : (
-                <span
-                  className="flex size-full items-center justify-center text-3xl font-bold"
-                  style={{ color: user.accentColor }}
-                  aria-hidden
-                >
-                  {user.personaName.charAt(0).toUpperCase()}
-                </span>
-              )}
-            </div>
+            {/* Frame is earned from the rarest achievement held, so the
+                ring is a claim you can verify by scrolling down. */}
+            <span className="sm:hidden">
+              <AvatarFrame
+                src={avatarUrl}
+                fallback={user.personaName}
+                frame={frame}
+                size={84}
+                priority
+              />
+            </span>
+            <span className="hidden sm:inline-block">
+              <AvatarFrame
+                src={avatarUrl}
+                fallback={user.personaName}
+                frame={frame}
+                size={124}
+                priority
+              />
+            </span>
 
             <div className="min-w-0 flex-1 pb-1 sm:hidden">
               <h1 className="truncate text-xl font-bold tracking-tight">
                 {user.personaName}
               </h1>
+              <p className="text-[11px] font-medium" style={{ color: frame.colors[0] }}>
+                {frame.label}
+              </p>
             </div>
           </div>
 
           <div className="min-w-0 flex-1 sm:pb-1">
-            <h1 className="hidden text-2xl font-bold tracking-tight sm:block sm:text-3xl">
-              {user.personaName}
-            </h1>
+            <div className="hidden items-center gap-2.5 sm:flex">
+              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                {user.personaName}
+              </h1>
+              {frame.tier !== "none" && (
+                <span
+                  className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                  style={{
+                    color: frame.colors[0],
+                    backgroundColor: frame.glow,
+                  }}
+                  title={frame.requirement}
+                >
+                  {frame.label}
+                </span>
+              )}
+            </div>
             {user.bio ? (
               <p className="mt-1 max-w-xl text-sm text-muted">{user.bio}</p>
             ) : (
@@ -226,7 +260,7 @@ export default async function ProfilePage({
         )}
 
         {neverSynced && !user.profileIsPrivate && hasApiKey && (
-          <p className="mt-4 rounded-lg border border-border bg-panel px-4 py-3 text-sm text-muted">
+          <p className="mt-4 rounded-lg border border-border bg-panel panel-raised px-4 py-3 text-sm text-muted">
             {isOwner
               ? "Nothing synced yet — the first scan is running now."
               : "This profile has not been synced yet."}
@@ -325,7 +359,7 @@ export default async function ProfilePage({
                 <Link
                   key={l.id}
                   href={`/u/${user.handle ?? user.steamId}/lists/${l.slug}`}
-                  className="block rounded-lg border border-border bg-panel p-4 transition-colors hover:border-border-strong"
+                  className="block rounded-lg border border-border bg-panel panel-raised p-4 transition-colors hover:border-border-strong"
                 >
                   <h3 className="font-medium">{l.name}</h3>
                   {l.description && (
@@ -348,7 +382,7 @@ export default async function ProfilePage({
             title="Timeline"
             hint="Every unlock in order. Steam now; PSN and RetroAchievements merge in here later."
           >
-            <ol className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-panel">
+            <ol className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-panel panel-raised">
               {groupByMonth(timeline).map(([month, unlocks]) => (
                 <li key={month}>
                   <p className="bg-raised px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-faint">
@@ -366,7 +400,7 @@ export default async function ProfilePage({
         )}
 
         {!neverSynced && stats.unlocked === 0 && !user.profileIsPrivate && (
-          <p className="mt-10 rounded-lg border border-border bg-panel px-4 py-6 text-center text-sm text-muted">
+          <p className="mt-10 rounded-lg border border-border bg-panel panel-raised px-4 py-6 text-center text-sm text-muted">
             No achievements found in this library yet.
           </p>
         )}
@@ -389,7 +423,7 @@ function Stat({
   accent?: boolean;
 }) {
   return (
-    <div className="bg-panel px-3 py-3 sm:px-4 sm:py-4">
+    <div className="bg-panel panel-raised px-3 py-3 sm:px-4 sm:py-4">
       <p
         className="tnum text-xl font-bold tracking-tight sm:text-2xl"
         style={accent ? { color: "var(--accent)" } : undefined}

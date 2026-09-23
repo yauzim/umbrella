@@ -381,6 +381,37 @@ export async function getGameHeaderUrl(
   return row?.headerUrl ?? null;
 }
 
+export interface BannerArt {
+  hero: string | null;
+  header: string | null;
+  logo: string | null;
+}
+
+/**
+ * The full art set for a profile banner. Falls back through the chosen
+ * banner game, then the first pinned game, so a profile looks furnished
+ * before anyone has picked anything.
+ */
+export async function getBannerArt(
+  appid: number | null,
+  fallbackAppid: number | null,
+): Promise<BannerArt> {
+  const target = appid ?? fallbackAppid;
+  if (!target) return { hero: null, header: null, logo: null };
+
+  const [row] = await db
+    .select({
+      hero: games.heroUrl,
+      header: games.headerUrl,
+      logo: games.logoUrl,
+    })
+    .from(games)
+    .where(eq(games.appid, target))
+    .limit(1);
+
+  return row ?? { hero: null, header: null, logo: null };
+}
+
 export interface PickerGame {
   appid: number;
   name: string;

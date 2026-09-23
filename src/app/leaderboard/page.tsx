@@ -122,7 +122,7 @@ export default async function LeaderboardPage({
       )}
 
       {scope !== "world" && !session && (
-        <p className="mt-5 rounded-lg border border-border bg-panel px-4 py-3 text-sm text-muted">
+        <p className="mt-5 rounded-lg border border-border bg-panel panel-raised px-4 py-3 text-sm text-muted">
           Sign in to see {scope === "friends" ? "friends" : "region"} standings.
         </p>
       )}
@@ -135,7 +135,7 @@ export default async function LeaderboardPage({
             {board.total === 1 ? "player" : "players"} ranked · {unit}
           </p>
 
-          <ol className="mt-2 divide-y divide-border overflow-hidden rounded-xl border border-border bg-panel">
+          <ol className="mt-2 divide-y divide-border overflow-hidden rounded-xl border border-border bg-panel panel-raised">
             {board.rows.map((r) => (
               <li
                 key={r.steamId}
@@ -192,7 +192,7 @@ export default async function LeaderboardPage({
           {/* Standing when the viewer is off the visible page ---------- */}
           {board.viewer && !viewerOnPage && (
             <div
-              className="mt-3 flex items-center gap-3 rounded-xl border border-border bg-panel px-3 py-2.5 sm:px-4"
+              className="mt-3 flex items-center gap-3 rounded-xl border border-border bg-panel panel-raised px-3 py-2.5 sm:px-4"
               style={{ boxShadow: "inset 3px 0 0 0 var(--accent)" }}
             >
               <span className="tnum w-8 shrink-0 text-sm font-semibold text-faint">
@@ -211,7 +211,7 @@ export default async function LeaderboardPage({
           {board.viewer && viewerOnPage && <JumpToMe rank={board.viewer.rank} />}
         </>
       ) : (
-        <p className="mt-6 rounded-lg border border-border bg-panel px-4 py-8 text-center text-sm text-muted">
+        <p className="mt-6 rounded-lg border border-border bg-panel panel-raised px-4 py-8 text-center text-sm text-muted">
           {scope === "friends"
             ? "None of your Steam friends have synced a library here yet."
             : scope === "region" && board.viewerMissingRegion

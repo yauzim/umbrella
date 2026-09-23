@@ -50,19 +50,33 @@ export default async function GamePage({
   return (
     <div>
       {/* Banner ------------------------------------------------------- */}
-      <div className="relative h-36 overflow-hidden border-b border-border sm:h-48">
-        {game.headerUrl && (
+      <div className="relative h-44 overflow-hidden border-b border-border sm:h-64">
+        {(game.heroUrl ?? game.headerUrl) && (
           <Image
-            src={game.headerUrl}
+            src={game.heroUrl ?? game.headerUrl!}
             alt=""
             fill
             sizes="100vw"
             priority
-            className="scale-110 object-cover opacity-30 blur-[2px]"
+            className="object-cover object-[center_30%]"
             unoptimized
           />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/85 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/65 to-bg/15" />
+        <div className="absolute inset-0 bg-gradient-to-r from-bg/80 via-transparent to-transparent" />
+
+        {game.logoUrl && (
+          <div className="pointer-events-none absolute bottom-4 right-4 hidden h-16 w-48 opacity-75 sm:block">
+            <Image
+              src={game.logoUrl}
+              alt=""
+              fill
+              sizes="192px"
+              className="object-contain object-right-bottom drop-shadow-lg"
+              unoptimized
+            />
+          </div>
+        )}
       </div>
 
       <div className="mx-auto max-w-5xl px-4 pb-24 sm:px-6">
@@ -175,7 +189,7 @@ export default async function GamePage({
               }
             />
           ) : (
-            <p className="rounded-xl border border-border bg-panel px-4 py-6 text-center text-sm text-muted">
+            <p className="rounded-xl border border-border bg-panel panel-raised px-4 py-6 text-center text-sm text-muted">
               <Link href="/api/auth/steam" className="underline underline-offset-2">
                 Sign in through Steam
               </Link>{" "}
@@ -194,7 +208,7 @@ export default async function GamePage({
               {reviews.map((r) => (
                 <li
                   key={r.steamId}
-                  className="rounded-xl border border-border bg-panel p-4"
+                  className="rounded-xl border border-border bg-panel panel-raised p-4"
                 >
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                     {r.avatarUrl && (
@@ -259,7 +273,7 @@ export default async function GamePage({
                 <li key={p.steamId}>
                   <Link
                     href={`/u/${p.handle ?? p.steamId}`}
-                    className="flex items-center gap-2 rounded-lg border border-border bg-panel px-2.5 py-1.5 text-xs transition-colors hover:border-border-strong"
+                    className="flex items-center gap-2 rounded-lg border border-border bg-panel panel-raised px-2.5 py-1.5 text-xs transition-colors hover:border-border-strong"
                   >
                     {p.avatarUrl && (
                       <Image
@@ -291,7 +305,7 @@ export default async function GamePage({
               </h2>
               <p className="text-xs text-faint">Rarest first</p>
             </div>
-            <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-panel">
+            <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-panel panel-raised">
               {achievements.map((a) => {
                 const r = rarityOf(a.globalPercent);
                 const icon = a.unlocked ? a.icon : (a.iconGray ?? a.icon);
@@ -351,7 +365,7 @@ function Stat({
   accent?: boolean;
 }) {
   return (
-    <div className="bg-panel px-3 py-3 sm:px-4 sm:py-4">
+    <div className="bg-panel panel-raised px-3 py-3 sm:px-4 sm:py-4">
       <p
         className="tnum text-xl font-bold tracking-tight sm:text-2xl"
         style={accent ? { color: "var(--accent)" } : undefined}

@@ -32,6 +32,13 @@ export const games = sqliteTable("games", {
   // from the store API. Once checked, the resolved URL lives in headerUrl
   // and this stamp stops us asking again.
   artCheckedAt: integer("art_checked_at", { mode: "timestamp" }),
+  // 1920x620 art Valve produces specifically to sit behind a page. Far
+  // better as a profile background than a stretched 460x215 header, and
+  // it exists for games whose header.jpg does not.
+  heroUrl: text("hero_url"),
+  // Transparent wordmark meant to be composited over the hero. Missing for
+  // very new releases, so every use has to tolerate null.
+  logoUrl: text("logo_url"),
 });
 
 export const achievements = sqliteTable(

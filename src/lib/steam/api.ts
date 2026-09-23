@@ -327,6 +327,45 @@ export function gameHeaderUrl(appid: number): string {
   return `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/header.jpg`;
 }
 
+export interface GameArtUrls {
+  header: string | null;
+  /** 1920x620 background art. Present far more often than header.jpg. */
+  hero: string | null;
+  /** Transparent wordmark for compositing over the hero. Often absent. */
+  logo: string | null;
+}
+
+async function exists(url: string): Promise<boolean> {
+  try {
+    const r = await fetch(url, { method: "HEAD", cache: "no-store" });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resolves the full art set for a game.
+ *
+ * Hero and logo live at stable, derivable paths on the legacy CDN even for
+ * releases whose header.jpg is missing, so they only need a HEAD check —
+ * no store lookup, no rate limit to respect.
+ */
+export async function resolveGameArt(appid: number): Promise<GameArtUrls> {
+  const base = `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}`;
+  const [header, heroOk, logoOk] = await Promise.all([
+    resolveHeaderImage(appid),
+    exists(`${base}/library_hero.jpg`),
+    exists(`${base}/logo.png`),
+  ]);
+
+  return {
+    header,
+    hero: heroOk ? `${base}/library_hero.jpg` : null,
+    logo: logoOk ? `${base}/logo.png` : null,
+  };
+}
+
 /**
  * Resolves a game's real header image.
  *
