@@ -4,131 +4,148 @@ import { AvatarFrame } from "@/components/avatar-frame";
 import { frameFor } from "@/lib/frames";
 import type { ProfileFriend } from "@/lib/queries";
 
-/** Non-members beyond this collapse to a "+N" count. */
-const COMPACT_LIMIT = 18;
+/** How many friends the profile sidebar shows before "View all". */
+export const SIDEBAR_FRIENDS = 5;
 
 /**
- * Steam friends on a profile.
- *
- * Members get the full treatment — their own earned frame, completion
- * count and a link — because they are people you can actually compare
- * shelves with. Friends who have not joined are a compact strip that links
- * out to Steam, so the section is useful before anyone else signs up.
+ * One friend. Members link to their Umbrella profile and wear their own
+ * earned frame; everyone else links out to Steam, slightly muted, so it is
+ * obvious at a glance who you can actually compare shelves with.
  */
-export function FriendsSection({
+export function FriendRow({ friend }: { friend: ProfileFriend }) {
+  const name = friend.personaName ?? "Steam user";
+
+  if (friend.isMember) {
+    const frame = frameFor(friend.rarestPercent);
+    return (
+      <Link
+        href={`/u/${friend.handle ?? friend.steamId}`}
+        className="flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-raised"
+      >
+        <AvatarFrame
+          src={friend.avatarUrl}
+          fallback={name}
+          frame={frame}
+          size={40}
+        />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium">{name}</span>
+          <span className="tnum block truncate text-xs text-faint">
+            {friend.perfectGames} at 100%
+            {frame.tier !== "none" && (
+              <span style={{ color: frame.colors[0] }}> · {frame.label}</span>
+            )}
+          </span>
+        </span>
+      </Link>
+    );
+  }
+
+  return (
+    <a
+      href={`https://steamcommunity.com/profiles/${friend.steamId}`}
+      target="_blank"
+      rel="noreferrer"
+      className="group flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-raised"
+    >
+      <span className="block size-10 shrink-0 overflow-hidden rounded-lg border border-border opacity-80 grayscale-[35%] transition group-hover:opacity-100 group-hover:grayscale-0">
+        {friend.avatarUrl ? (
+          <Image
+            src={friend.avatarUrl}
+            alt=""
+            width={40}
+            height={40}
+            className="size-full object-cover"
+            unoptimized
+          />
+        ) : (
+          <span className="flex size-full items-center justify-center bg-raised text-xs text-faint">
+            {name.charAt(0).toUpperCase()}
+          </span>
+        )}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm text-muted group-hover:text-text">
+          {name}
+        </span>
+        <span className="block text-xs text-faint">Not on Umbrella yet</span>
+      </span>
+    </a>
+  );
+}
+
+/**
+ * Profile sidebar: a handful of friends, members first, with a way through
+ * to the rest. Deliberately short — it is context beside the shelf, not a
+ * second shelf.
+ */
+export function FriendsSidebar({
   friends,
+  profilePath,
   isOwner,
+  className = "",
 }: {
   friends: ProfileFriend[];
+  profilePath: string;
   isOwner: boolean;
+  className?: string;
 }) {
   if (friends.length === 0) return null;
 
-  const members = friends.filter((f) => f.isMember);
-  const others = friends.filter((f) => !f.isMember);
-  const shown = others.slice(0, COMPACT_LIMIT);
-  const hidden = others.length - shown.length;
+  const members = friends.filter((f) => f.isMember).length;
+  const shown = friends.slice(0, SIDEBAR_FRIENDS);
 
   return (
-    <section className="mt-10">
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+    <section className={className}>
+      <div className="mb-3 flex items-baseline justify-between gap-3">
         <h2 className="text-lg font-semibold tracking-tight">
           Friends{" "}
           <span className="tnum text-sm font-normal text-faint">
             {friends.length}
           </span>
         </h2>
-        <p className="text-xs text-faint">
-          {members.length > 0
-            ? `${members.length} on Umbrella`
-            : "None on Umbrella yet"}
-        </p>
+        {friends.length > SIDEBAR_FRIENDS && (
+          <Link
+            href={`${profilePath}/friends`}
+            className="text-xs text-faint underline-offset-2 hover:text-text hover:underline"
+          >
+            View all
+          </Link>
+        )}
       </div>
 
-      {members.length > 0 && (
-        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {members.map((f) => {
-            const frame = frameFor(f.rarestPercent);
-            return (
-              <li key={f.steamId}>
-                <Link
-                  href={`/u/${f.handle ?? f.steamId}`}
-                  className="panel-raised flex items-center gap-3 rounded-xl border border-border bg-panel p-2.5 transition-colors hover:border-border-strong"
-                >
-                  <AvatarFrame
-                    src={f.avatarUrl}
-                    fallback={f.personaName ?? "?"}
-                    frame={frame}
-                    size={48}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">
-                      {f.personaName ?? "Steam user"}
-                    </p>
-                    <p className="tnum text-xs text-faint">
-                      {f.perfectGames} at 100%
-                      {frame.tier !== "none" && (
-                        <span style={{ color: frame.colors[0] }}>
-                          {" · "}
-                          {frame.label}
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                </Link>
-              </li>
-            );
-          })}
+      <div className="panel-raised rounded-xl border border-border bg-panel p-1.5">
+        {/* One column in the sidebar; two across when the section drops
+            below the games on a tablet and has the full width to fill. */}
+        <ul className="grid gap-0.5 md:grid-cols-2 lg:grid-cols-1">
+          {shown.map((f) => (
+            <li key={f.steamId}>
+              <FriendRow friend={f} />
+            </li>
+          ))}
         </ul>
-      )}
 
-      {shown.length > 0 && (
-        <div
-          className={`panel-raised rounded-xl border border-border bg-panel p-3 ${
-            members.length > 0 ? "mt-2" : ""
-          }`}
-        >
-          <ul className="flex flex-wrap gap-1.5">
-            {shown.map((f) => (
-              <li key={f.steamId}>
-                <a
-                  href={`https://steamcommunity.com/profiles/${f.steamId}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  title={`${f.personaName ?? "Steam user"} — not on Umbrella yet`}
-                  className="block size-9 overflow-hidden rounded-lg border border-border opacity-70 grayscale-[35%] transition hover:opacity-100 hover:grayscale-0"
-                >
-                  {f.avatarUrl ? (
-                    <Image
-                      src={f.avatarUrl}
-                      alt={f.personaName ?? ""}
-                      width={36}
-                      height={36}
-                      className="size-full object-cover"
-                      unoptimized
-                    />
-                  ) : (
-                    <span className="flex size-full items-center justify-center bg-raised text-xs text-faint">
-                      {(f.personaName ?? "?").charAt(0).toUpperCase()}
-                    </span>
-                  )}
-                </a>
-              </li>
-            ))}
-            {hidden > 0 && (
-              <li className="tnum flex size-9 items-center justify-center rounded-lg border border-dashed border-border text-[11px] text-faint">
-                +{hidden}
-              </li>
-            )}
-          </ul>
-          {isOwner && members.length === 0 && (
-            <p className="mt-2.5 text-xs text-faint">
-              When any of them sign in, they show up here with their shelf and
-              frame — and on your friends leaderboard.
-            </p>
-          )}
-        </div>
-      )}
+        <p className="border-t border-border px-2 pb-1 pt-2 text-[11px] text-faint">
+          {members > 0
+            ? `${members} on Umbrella`
+            : isOwner
+              ? "None here yet — when they sign in they show up with their frame."
+              : "None on Umbrella yet"}
+        </p>
+      </div>
     </section>
+  );
+}
+
+/** Every friend, for the dedicated friends page. */
+export function FriendsGrid({ friends }: { friends: ProfileFriend[] }) {
+  return (
+    <ul className="panel-raised grid gap-0.5 rounded-xl border border-border bg-panel p-1.5 sm:grid-cols-2 lg:grid-cols-3">
+      {friends.map((f) => (
+        <li key={f.steamId}>
+          <FriendRow friend={f} />
+        </li>
+      ))}
+    </ul>
   );
 }

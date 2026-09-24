@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AchievementRow, AchievementTile } from "@/components/achievement-tile";
 import { AvatarFrame } from "@/components/avatar-frame";
-import { FriendsSection } from "@/components/friends-section";
+import { FriendsSidebar } from "@/components/friends-section";
 import { GameCard } from "@/components/game-card";
 import { SyncButton } from "@/components/sync-button";
 import {
@@ -271,9 +271,13 @@ export default async function ProfilePage({
           </p>
         )}
 
-        {/* Pinned + recent -------------------------------------------- */}
-        {(favorites.length > 0 || recent.length > 0) && (
-          <div className="mt-8 grid gap-8 lg:grid-cols-2">
+        {/* Pinned · Recently played · Friends ------------------------- */}
+        {/* Each game block is a fixed 2x2 so the cards get real size; the
+            friends column is a narrow sidebar beside them on desktop. On a
+            tablet the two game blocks share a row and friends drop below;
+            on a phone everything stacks. */}
+        {(favorites.length > 0 || recent.length > 0 || friends.length > 0) && (
+          <div className="mt-8 grid gap-8 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_16rem] lg:gap-6">
             <section>
               <div className="mb-3 flex items-baseline justify-between gap-3">
                 <h2 className="text-lg font-semibold tracking-tight">Pinned</h2>
@@ -287,13 +291,13 @@ export default async function ProfilePage({
                 )}
               </div>
               {favorites.length > 0 ? (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3">
                   {favorites.map((g) => (
                     <GameCard key={g.appid} game={g} />
                   ))}
                 </div>
               ) : (
-                <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-xs text-faint">
+                <p className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-xs text-faint">
                   {isOwner
                     ? "Pin four games you are proud of."
                     : "Nothing pinned yet."}
@@ -306,18 +310,22 @@ export default async function ProfilePage({
                 <h2 className="mb-3 text-lg font-semibold tracking-tight">
                   Recently played
                 </h2>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3">
                   {recent.map((g) => (
                     <GameCard key={g.appid} game={g} />
                   ))}
                 </div>
               </section>
             )}
+
+            <FriendsSidebar
+              friends={friends}
+              isOwner={isOwner}
+              profilePath={`/u/${user.handle ?? user.steamId}`}
+              className="md:col-span-2 lg:col-span-1"
+            />
           </div>
         )}
-
-        {/* Friends ---------------------------------------------------- */}
-        <FriendsSection friends={friends} isOwner={isOwner} />
 
         {/* Completed -------------------------------------------------- */}
         {perfect.length > 0 && (
