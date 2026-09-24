@@ -96,13 +96,6 @@ body {
     0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
-/* Unobtrusive scrollbar for inner scroll regions like the friends column,
-   where a full-width OS scrollbar would be the loudest thing on screen. */
-.thin-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-strong) transparent;
-}
-
 /* Fades the tail of a scroll region so cut-off content looks deliberate. */
 .fade-bottom {
   mask-image: linear-gradient(to bottom, black 85%, transparent 100%);

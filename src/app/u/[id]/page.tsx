@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AchievementRow, AchievementTile } from "@/components/achievement-tile";
 import { AvatarFrame } from "@/components/avatar-frame";
-import { FriendsColumn, FriendsSidebar } from "@/components/friends-section";
+import { FriendsSidebar } from "@/components/friends-section";
 import { GameCard } from "@/components/game-card";
 import { SyncButton } from "@/components/sync-button";
 import {
@@ -206,9 +206,9 @@ export default async function ProfilePage({
         </header>
 
         {/* Body: main column + a friends column that runs the full
-            height of the page on desktop. The column starts level with
-            the stats row and its list sticks under the nav, so friends
-            stay in view all the way down. */}
+            height of the page on desktop. It holds five friends, starts
+            level with the stats row, and sticks under the nav so they stay
+            in view all the way down. */}
         <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-6">
           <div className="min-w-0">
             {/* Stats ------------------------------------------------------ */}
@@ -427,12 +427,17 @@ export default async function ProfilePage({
             )}
           </div>
 
+          {/* The aside stretches the full height of the main column; the
+              box inside is sticky, so its five friends ride along from the
+              stats row to the bottom. mt-8 lines its top up with the stats. */}
           <aside className="hidden lg:block">
-            <FriendsColumn
-              friends={friends}
-              isOwner={isOwner}
-              profilePath={`/u/${user.handle ?? user.steamId}`}
-            />
+            <div className="sticky top-16 mt-8">
+              <FriendsSidebar
+                friends={friends}
+                isOwner={isOwner}
+                profilePath={`/u/${user.handle ?? user.steamId}`}
+              />
+            </div>
           </aside>
         </div>
       </div>
