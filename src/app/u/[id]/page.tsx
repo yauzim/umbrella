@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AchievementRow, AchievementTile } from "@/components/achievement-tile";
 import { AvatarFrame } from "@/components/avatar-frame";
-import { FriendsSidebar } from "@/components/friends-section";
+import { FriendsColumn, FriendsSidebar } from "@/components/friends-section";
 import { GameCard } from "@/components/game-card";
 import { SyncButton } from "@/components/sync-button";
 import {
@@ -205,220 +205,236 @@ export default async function ProfilePage({
           )}
         </header>
 
-        {/* Stats ------------------------------------------------------ */}
-        <section className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:mt-8 sm:grid-cols-4">
-          <Stat label="Achievements" value={stats.unlocked.toLocaleString()} />
-          <Stat
-            label="100% games"
-            value={stats.perfectGames.toLocaleString()}
-            accent
-          />
-          <Stat
-            label="Rarest unlock"
-            value={formatPercent(stats.rarestPercent)}
-          />
-          <Stat
-            label="Completion"
-            value={
-              stats.available > 0
-                ? `${Math.round((stats.unlocked / stats.available) * 100)}%`
-                : "—"
-            }
-            sub={
-              stats.available > 0
-                ? `of ${stats.available.toLocaleString()} played`
-                : undefined
-            }
-          />
-        </section>
-
-        {isOwner && !hasApiKey && (
-          <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-            <p className="font-medium">
-              Signed in — but no Steam API key is configured.
-            </p>
-            <p className="mt-1 text-amber-200/80">
-              Achievements cannot be fetched until one is set. Get a key at{" "}
-              <a
-                className="underline underline-offset-2"
-                href="https://steamcommunity.com/dev/apikey"
-                target="_blank"
-                rel="noreferrer"
-              >
-                steamcommunity.com/dev/apikey
-              </a>
-              , add it to{" "}
-              <code className="rounded bg-black/30 px-1">.env.local</code> as{" "}
-              <code className="rounded bg-black/30 px-1">STEAM_API_KEY</code>,
-              then restart the dev server.
-            </p>
-          </div>
-        )}
-
-        {user.profileIsPrivate && (
-          <p className="mt-4 rounded-lg border border-orange-500/30 bg-orange-500/10 px-4 py-3 text-sm text-orange-300">
-            This Steam profile is private, so achievements cannot be read.
-            {isOwner &&
-              " Set Steam → Privacy Settings → Game details to Public, then sync again."}
-          </p>
-        )}
-
-        {neverSynced && !user.profileIsPrivate && hasApiKey && (
-          <p className="mt-4 rounded-lg border border-border bg-panel panel-raised px-4 py-3 text-sm text-muted">
-            {isOwner
-              ? "Nothing synced yet — the first scan is running now."
-              : "This profile has not been synced yet."}
-          </p>
-        )}
-
-        {/* Pinned · Recently played · Friends ------------------------- */}
-        {/* Each game block is a fixed 2x2 so the cards get real size; the
-            friends column is a narrow sidebar beside them on desktop. On a
-            tablet the two game blocks share a row and friends drop below;
-            on a phone everything stacks. */}
-        {(favorites.length > 0 || recent.length > 0 || friends.length > 0) && (
-          <div className="mt-8 grid gap-8 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_16rem] lg:gap-6">
-            <section>
-              <div className="mb-3 flex items-baseline justify-between gap-3">
-                <h2 className="text-lg font-semibold tracking-tight">Pinned</h2>
-                {isOwner && favorites.length === 0 && (
-                  <Link
-                    href="/settings"
-                    className="text-xs text-faint underline-offset-2 hover:underline"
-                  >
-                    Pick four
-                  </Link>
-                )}
-              </div>
-              {favorites.length > 0 ? (
-                <div className="grid grid-cols-2 gap-3">
-                  {favorites.map((g) => (
-                    <GameCard key={g.appid} game={g} />
-                  ))}
-                </div>
-              ) : (
-                <p className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-xs text-faint">
-                  {isOwner
-                    ? "Pin four games you are proud of."
-                    : "Nothing pinned yet."}
-                </p>
-              )}
+        {/* Body: main column + a friends column that runs the full
+            height of the page on desktop. The column starts level with
+            the stats row and its list sticks under the nav, so friends
+            stay in view all the way down. */}
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-6">
+          <div className="min-w-0">
+            {/* Stats ------------------------------------------------------ */}
+            <section className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:mt-8 sm:grid-cols-4">
+              <Stat label="Achievements" value={stats.unlocked.toLocaleString()} />
+              <Stat
+                label="100% games"
+                value={stats.perfectGames.toLocaleString()}
+                accent
+              />
+              <Stat
+                label="Rarest unlock"
+                value={formatPercent(stats.rarestPercent)}
+              />
+              <Stat
+                label="Completion"
+                value={
+                  stats.available > 0
+                    ? `${Math.round((stats.unlocked / stats.available) * 100)}%`
+                    : "—"
+                }
+                sub={
+                  stats.available > 0
+                    ? `of ${stats.available.toLocaleString()} played`
+                    : undefined
+                }
+              />
             </section>
 
-            {recent.length > 0 && (
-              <section>
-                <h2 className="mb-3 text-lg font-semibold tracking-tight">
-                  Recently played
-                </h2>
-                <div className="grid grid-cols-2 gap-3">
-                  {recent.map((g) => (
+            {isOwner && !hasApiKey && (
+              <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                <p className="font-medium">
+                  Signed in — but no Steam API key is configured.
+                </p>
+                <p className="mt-1 text-amber-200/80">
+                  Achievements cannot be fetched until one is set. Get a key at{" "}
+                  <a
+                    className="underline underline-offset-2"
+                    href="https://steamcommunity.com/dev/apikey"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    steamcommunity.com/dev/apikey
+                  </a>
+                  , add it to{" "}
+                  <code className="rounded bg-black/30 px-1">.env.local</code> as{" "}
+                  <code className="rounded bg-black/30 px-1">STEAM_API_KEY</code>,
+                  then restart the dev server.
+                </p>
+              </div>
+            )}
+
+            {user.profileIsPrivate && (
+              <p className="mt-4 rounded-lg border border-orange-500/30 bg-orange-500/10 px-4 py-3 text-sm text-orange-300">
+                This Steam profile is private, so achievements cannot be read.
+                {isOwner &&
+                  " Set Steam → Privacy Settings → Game details to Public, then sync again."}
+              </p>
+            )}
+
+            {neverSynced && !user.profileIsPrivate && hasApiKey && (
+              <p className="mt-4 rounded-lg border border-border bg-panel panel-raised px-4 py-3 text-sm text-muted">
+                {isOwner
+                  ? "Nothing synced yet — the first scan is running now."
+                  : "This profile has not been synced yet."}
+              </p>
+            )}
+
+            {/* Pinned · Recently played · Friends ------------------------- */}
+            {/* Each game block is a fixed 2x2 so the cards get real size. On
+                desktop friends live in the full-height column instead; below
+                that width this compact box of five sits under the games, so
+                phones do not have friends buried beneath the timeline. */}
+            {(favorites.length > 0 || recent.length > 0 || friends.length > 0) && (
+              <div className="mt-8 grid gap-8 md:grid-cols-2 lg:gap-6">
+                <section>
+                  <div className="mb-3 flex items-baseline justify-between gap-3">
+                    <h2 className="text-lg font-semibold tracking-tight">Pinned</h2>
+                    {isOwner && favorites.length === 0 && (
+                      <Link
+                        href="/settings"
+                        className="text-xs text-faint underline-offset-2 hover:underline"
+                      >
+                        Pick four
+                      </Link>
+                    )}
+                  </div>
+                  {favorites.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      {favorites.map((g) => (
+                        <GameCard key={g.appid} game={g} />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-xs text-faint">
+                      {isOwner
+                        ? "Pin four games you are proud of."
+                        : "Nothing pinned yet."}
+                    </p>
+                  )}
+                </section>
+
+                {recent.length > 0 && (
+                  <section>
+                    <h2 className="mb-3 text-lg font-semibold tracking-tight">
+                      Recently played
+                    </h2>
+                    <div className="grid grid-cols-2 gap-3">
+                      {recent.map((g) => (
+                        <GameCard key={g.appid} game={g} />
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                <FriendsSidebar
+                  friends={friends}
+                  isOwner={isOwner}
+                  profilePath={`/u/${user.handle ?? user.steamId}`}
+                  className="md:col-span-2 lg:hidden"
+                />
+              </div>
+            )}
+
+            {/* Completed -------------------------------------------------- */}
+            {perfect.length > 0 && (
+              <Section
+                title="Completed"
+                hint={`${stats.perfectGames} games taken to 100%`}
+              >
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                  {perfect.map((g) => (
                     <GameCard key={g.appid} game={g} />
                   ))}
                 </div>
-              </section>
+              </Section>
             )}
 
-            <FriendsSidebar
+            {/* Rarest ----------------------------------------------------- */}
+            {rarest.length > 0 && (
+              <Section
+                title="Rarest unlocks"
+                hint="At most two per game, so the shelf shows range"
+              >
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {rarest.map((u) => (
+                    <AchievementTile key={u.achievementId} unlock={u} />
+                  ))}
+                </div>
+              </Section>
+            )}
+
+            {/* In progress ------------------------------------------------ */}
+            {inProgress.length > 0 && (
+              <Section title="Closest to done" hint="Sorted by how near the finish">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                  {inProgress.map((g) => (
+                    <GameCard key={g.appid} game={g} />
+                  ))}
+                </div>
+              </Section>
+            )}
+
+            {/* Lists ------------------------------------------------------ */}
+            {lists.length > 0 && (
+              <Section title="Lists">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {lists.map((l) => (
+                    <Link
+                      key={l.id}
+                      href={`/u/${user.handle ?? user.steamId}/lists/${l.slug}`}
+                      className="block rounded-lg border border-border bg-panel panel-raised p-4 transition-colors hover:border-border-strong"
+                    >
+                      <h3 className="font-medium">{l.name}</h3>
+                      {l.description && (
+                        <p className="mt-1 line-clamp-2 text-xs text-muted">
+                          {l.description}
+                        </p>
+                      )}
+                      <p className="tnum mt-2 text-xs text-faint">
+                        {l.itemCount} {l.itemCount === 1 ? "game" : "games"}
+                      </p>
+                    </Link>
+                  ))}
+                </div>
+              </Section>
+            )}
+
+            {/* Timeline --------------------------------------------------- */}
+            {timeline.length > 0 && (
+              <Section
+                title="Timeline"
+                hint="Every unlock in order. Steam now; PSN and RetroAchievements merge in here later."
+              >
+                <ol className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-panel panel-raised">
+                  {groupByMonth(timeline).map(([month, unlocks]) => (
+                    <li key={month}>
+                      <p className="bg-raised px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-faint">
+                        {month}
+                      </p>
+                      <ul className="p-2">
+                        {unlocks.map((u) => (
+                          <AchievementRow key={u.achievementId} unlock={u} />
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+                </ol>
+              </Section>
+            )}
+
+            {!neverSynced && stats.unlocked === 0 && !user.profileIsPrivate && (
+              <p className="mt-10 rounded-lg border border-border bg-panel panel-raised px-4 py-6 text-center text-sm text-muted">
+                No achievements found in this library yet.
+              </p>
+            )}
+          </div>
+
+          <aside className="hidden lg:block">
+            <FriendsColumn
               friends={friends}
               isOwner={isOwner}
               profilePath={`/u/${user.handle ?? user.steamId}`}
-              className="md:col-span-2 lg:col-span-1"
             />
-          </div>
-        )}
-
-        {/* Completed -------------------------------------------------- */}
-        {perfect.length > 0 && (
-          <Section
-            title="Completed"
-            hint={`${stats.perfectGames} games taken to 100%`}
-          >
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {perfect.map((g) => (
-                <GameCard key={g.appid} game={g} />
-              ))}
-            </div>
-          </Section>
-        )}
-
-        {/* Rarest ----------------------------------------------------- */}
-        {rarest.length > 0 && (
-          <Section
-            title="Rarest unlocks"
-            hint="At most two per game, so the shelf shows range"
-          >
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {rarest.map((u) => (
-                <AchievementTile key={u.achievementId} unlock={u} />
-              ))}
-            </div>
-          </Section>
-        )}
-
-        {/* In progress ------------------------------------------------ */}
-        {inProgress.length > 0 && (
-          <Section title="Closest to done" hint="Sorted by how near the finish">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {inProgress.map((g) => (
-                <GameCard key={g.appid} game={g} />
-              ))}
-            </div>
-          </Section>
-        )}
-
-        {/* Lists ------------------------------------------------------ */}
-        {lists.length > 0 && (
-          <Section title="Lists">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {lists.map((l) => (
-                <Link
-                  key={l.id}
-                  href={`/u/${user.handle ?? user.steamId}/lists/${l.slug}`}
-                  className="block rounded-lg border border-border bg-panel panel-raised p-4 transition-colors hover:border-border-strong"
-                >
-                  <h3 className="font-medium">{l.name}</h3>
-                  {l.description && (
-                    <p className="mt-1 line-clamp-2 text-xs text-muted">
-                      {l.description}
-                    </p>
-                  )}
-                  <p className="tnum mt-2 text-xs text-faint">
-                    {l.itemCount} {l.itemCount === 1 ? "game" : "games"}
-                  </p>
-                </Link>
-              ))}
-            </div>
-          </Section>
-        )}
-
-        {/* Timeline --------------------------------------------------- */}
-        {timeline.length > 0 && (
-          <Section
-            title="Timeline"
-            hint="Every unlock in order. Steam now; PSN and RetroAchievements merge in here later."
-          >
-            <ol className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-panel panel-raised">
-              {groupByMonth(timeline).map(([month, unlocks]) => (
-                <li key={month}>
-                  <p className="bg-raised px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-faint">
-                    {month}
-                  </p>
-                  <ul className="p-2">
-                    {unlocks.map((u) => (
-                      <AchievementRow key={u.achievementId} unlock={u} />
-                    ))}
-                  </ul>
-                </li>
-              ))}
-            </ol>
-          </Section>
-        )}
-
-        {!neverSynced && stats.unlocked === 0 && !user.profileIsPrivate && (
-          <p className="mt-10 rounded-lg border border-border bg-panel panel-raised px-4 py-6 text-center text-sm text-muted">
-            No achievements found in this library yet.
-          </p>
-        )}
+          </aside>
+        </div>
       </div>
     </div>
   );
