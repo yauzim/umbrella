@@ -130,6 +130,29 @@ export async function getPlayerSummary(
   return data.response.players[0] ?? null;
 }
 
+/**
+ * Summaries for many players at once.
+ *
+ * The endpoint accepts up to 100 SteamIDs per call, so a whole friend list
+ * usually costs a single request rather than one per friend.
+ */
+export async function getPlayerSummaries(
+  steamIds: string[],
+): Promise<Map<string, SteamPlayerSummary>> {
+  const out = new Map<string, SteamPlayerSummary>();
+  for (let i = 0; i < steamIds.length; i += 100) {
+    const chunk = steamIds.slice(i, i + 100);
+    const data = await steamFetch<{
+      response: { players: SteamPlayerSummary[] };
+    }>("/ISteamUser/GetPlayerSummaries/v0002/", {
+      key: apiKey(),
+      steamids: chunk.join(","),
+    });
+    for (const p of data.response.players) out.set(p.steamid, p);
+  }
+  return out;
+}
+
 /** Turn a /id/<name> vanity URL into a SteamID64. */
 export async function resolveVanityUrl(name: string): Promise<string | null> {
   const data = await steamFetch<{

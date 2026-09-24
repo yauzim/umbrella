@@ -341,6 +341,11 @@ export const steamFriends = sqliteTable(
     // want the edge so their row lights up if they ever do.
     friendSteamId: text("friend_steam_id").notNull(),
     friendsSince: integer("friends_since", { mode: "timestamp" }),
+    // Snapshot of the friend's Steam identity, so the profile can render a
+    // face and a name for people who have never signed in here. Refreshed
+    // with the friend list; one batched call covers up to 100 of them.
+    personaName: text("persona_name"),
+    avatarUrl: text("avatar_url"),
   },
   (t) => [
     primaryKey({ columns: [t.steamId, t.friendSteamId] }),

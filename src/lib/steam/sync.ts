@@ -25,6 +25,7 @@ import {
   getFriendList,
   getOwnedGames,
   getPlayerAchievements,
+  getPlayerSummaries,
   getPlayerSummary,
   getSchemaForGame,
   resolveGameArt,
@@ -211,16 +212,29 @@ async function syncFriends(steamId: string): Promise<void> {
     return;
   }
 
+  // Names and avatars for everyone on the list, batched 100 per call. A
+  // failure here should not lose the friendships themselves, so it degrades
+  // to storing bare edges rather than aborting.
+  let summaries = new Map<string, { personaname: string; avatarfull: string }>();
+  try {
+    summaries = await getPlayerSummaries(friends.map((f) => f.steamid));
+  } catch {
+    // Keep going with SteamIDs only; the next daily refresh will fill in.
+  }
+
   db.transaction((tx) => {
     tx.delete(steamFriends)
       .where(eq(steamFriends.steamId, steamId))
       .run();
     for (const f of friends) {
+      const s = summaries.get(f.steamid);
       tx.insert(steamFriends)
         .values({
           steamId,
           friendSteamId: f.steamid,
           friendsSince: f.friend_since ? new Date(f.friend_since * 1000) : null,
+          personaName: s?.personaname ?? null,
+          avatarUrl: s?.avatarfull ?? null,
         })
         .onConflictDoNothing()
         .run();

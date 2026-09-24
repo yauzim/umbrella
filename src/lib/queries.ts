@@ -412,6 +412,70 @@ export async function getBannerArt(
   return row ?? { hero: null, header: null, logo: null };
 }
 
+export interface ProfileFriend {
+  steamId: string;
+  personaName: string | null;
+  avatarUrl: string | null;
+  /** Set when this friend has an Umbrella profile. */
+  handle: string | null;
+  isMember: boolean;
+  /** Their rarest unlock, so a member's earned frame can be drawn. */
+  rarestPercent: number | null;
+  perfectGames: number;
+}
+
+/**
+ * Steam friends, members first.
+ *
+ * Members are the ones worth clicking — they have a profile, a frame and
+ * a completion count. Everyone else is shown compactly so the section
+ * still reads as "your people" before any of them have joined.
+ */
+export async function getProfileFriends(
+  steamId: string,
+): Promise<ProfileFriend[]> {
+  const rows = await db.all<{
+    steam_id: string;
+    persona_name: string | null;
+    avatar_url: string | null;
+    handle: string | null;
+    is_member: number;
+    rarest: number | null;
+    perfect: number;
+  }>(sql`
+    SELECT f.friend_steam_id AS steam_id,
+           COALESCE(u.persona_name, f.persona_name) AS persona_name,
+           COALESCE(u.avatar_url, f.avatar_url)     AS avatar_url,
+           u.handle,
+           CASE WHEN u.steam_id IS NULL THEN 0 ELSE 1 END AS is_member,
+           (SELECT MIN(a.global_percent)
+              FROM user_achievements ua
+              JOIN achievements a ON a.id = ua.achievement_id
+             WHERE ua.steam_id = f.friend_steam_id) AS rarest,
+           (SELECT COUNT(*)
+              FROM user_games ug
+              JOIN games g ON g.appid = ug.appid
+             WHERE ug.steam_id = f.friend_steam_id
+               AND g.achievement_count > 0
+               AND ug.unlocked_count >= g.achievement_count) AS perfect
+    FROM steam_friends f
+    LEFT JOIN users u ON u.steam_id = f.friend_steam_id
+    WHERE f.steam_id = ${steamId}
+    ORDER BY is_member DESC, perfect DESC,
+             LOWER(COALESCE(u.persona_name, f.persona_name, '')) ASC
+  `);
+
+  return rows.map((r) => ({
+    steamId: r.steam_id,
+    personaName: r.persona_name,
+    avatarUrl: r.avatar_url,
+    handle: r.handle,
+    isMember: r.is_member === 1,
+    rarestPercent: r.rarest,
+    perfectGames: r.perfect,
+  }));
+}
+
 export interface PickerGame {
   appid: number;
   name: string;

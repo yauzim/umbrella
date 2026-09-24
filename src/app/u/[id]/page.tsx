@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AchievementRow, AchievementTile } from "@/components/achievement-tile";
 import { AvatarFrame } from "@/components/avatar-frame";
+import { FriendsSection } from "@/components/friends-section";
 import { GameCard } from "@/components/game-card";
 import { SyncButton } from "@/components/sync-button";
 import {
@@ -12,6 +13,7 @@ import {
   getPerfectGames,
   getProfileStats,
   getBannerArt,
+  getProfileFriends,
   getProfileUser,
   getRarestUnlocks,
   getRecentGames,
@@ -50,6 +52,7 @@ export default async function ProfilePage({
     timeline,
     lists,
     avatarUrl,
+    friends,
   ] = await Promise.all([
     getProfileStats(user.steamId),
     getFavoriteGames(user.steamId),
@@ -60,6 +63,7 @@ export default async function ProfilePage({
     getTimeline(user.steamId, { limit: 25 }),
     getLists(user.steamId),
     resolveAvatarUrl(user),
+    getProfileFriends(user.steamId),
   ]);
 
   const banner = await getBannerArt(
@@ -311,6 +315,9 @@ export default async function ProfilePage({
             )}
           </div>
         )}
+
+        {/* Friends ---------------------------------------------------- */}
+        <FriendsSection friends={friends} isOwner={isOwner} />
 
         {/* Completed -------------------------------------------------- */}
         {perfect.length > 0 && (
